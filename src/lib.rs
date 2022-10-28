@@ -5,6 +5,17 @@ mod vm;
 pub use compiler::Compiler;
 pub use vm::{Value, Vm};
 
+pub static PRELUDE: &str = r#"
+let nd = fn (n) __random n;
+let d4 = fn () nd(4);
+let d6 = fn () nd(6);
+let d8 = fn () nd(8);
+let d10 = fn () nd(10);
+let d12 = fn () nd(12);
+let d20 = fn () nd(20);
+let d100 = fn () nd(100);
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43,11 +54,10 @@ mod tests {
     }
 
     fn assert_result(code: &str, value: Value) {
-        assert_eq!(
-            Vm::default()
-                .execute(&compiler::Compiler::default().compile(code).unwrap())
-                .unwrap(),
-            value
-        )
+        let chunk = compiler::Compiler::default().compile(code).unwrap();
+        for result in chunk.iter() {
+            println!("{:?}", result.unwrap());
+        }
+        assert_eq!(Vm::default().execute(&chunk).unwrap(), value)
     }
 }

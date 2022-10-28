@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::bytecode::{
     Add, And, BooleanLit, Chunk, Divide, Equal, Greater, GreaterEqual, Instruction, Less,
     LessEqual, LoadLocal, Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal,
-    Subtract,
+    Random, Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -29,7 +29,7 @@ impl Default for Compiler {
     fn default() -> Self {
         Self {
             scopes: vec![Scope::default()],
-            next_local_id: u32::MAX,
+            next_local_id: 0,
             chunk: Chunk::default(),
         }
     }
@@ -299,6 +299,7 @@ impl Compiler {
             }),
             Rule::identifier => self.identifier(pri)?,
             Rule::function => todo!(),
+            Rule::internal_random => self.random(pri)?,
             _ => {
                 return Err(anyhow!(
                     "internal parsing error, unexpected {}",
@@ -312,6 +313,20 @@ impl Compiler {
     fn identifier(&mut self, id: Pair<Rule>) -> Result<()> {
         let local_id = self.resolve_local(id.as_str())?;
         self.chunk.push(LoadLocal { id: local_id });
+        Ok(())
+    }
+
+    fn random(&mut self, rand: Pair<Rule>) -> Result<()> {
+        let number_pair = rand
+            .into_inner()
+            .next()
+            .context("internal parsing error, expected random number")?;
+        let number = number_pair
+            .as_str()
+            .parse()
+            .context("error parsing number")?;
+        self.chunk.push(NumberLit { value: number });
+        self.chunk.push(Random);
         Ok(())
     }
 
@@ -344,7 +359,7 @@ impl Compiler {
 
     fn next_local_id(&mut self) -> u32 {
         let next = self.next_local_id;
-        self.next_local_id -= 1;
+        self.next_local_id += 1;
         next
     }
 

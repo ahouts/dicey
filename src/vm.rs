@@ -1,8 +1,8 @@
+use crate::bytecode::Chunk;
 use anyhow::{anyhow, Context, Result};
+use fastrand::Rng;
 use std::collections::BTreeMap;
 use std::fmt;
-
-use crate::bytecode::Chunk;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
@@ -47,11 +47,24 @@ impl fmt::Display for Value {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+enum Reachability {
+    Stack,
+    Unknown,
+}
+
+#[derive(Debug, Clone)]
+struct Local {
+    value: Value,
+    reachability: Reachability,
+}
+
 #[derive(Debug, Default)]
 pub struct Vm {
     stack: Vec<Value>,
-    locals: BTreeMap<u32, Value>,
+    locals: BTreeMap<u32, Local>,
     pc: usize,
+    rng: Rng,
 }
 
 impl Vm {
@@ -143,19 +156,31 @@ impl Vm {
                 }
                 crate::bytecode::Instruction::PushLocal(local) => {
                     let value = self.pop()?;
-                    self.locals.insert(local.id, value);
+                    self.locals.insert(
+                        local.id,
+                        Local {
+                            value,
+                            reachability: Reachability::Stack,
+                        },
+                    );
                 }
                 crate::bytecode::Instruction::PopLocal(local) => {
-                    self.locals
-                        .remove(&local.id)
+                    let local = self
+                        .locals
+                        .get_mut(&local.id)
                         .with_context(|| anyhow!("tried to pop unknown local {}", local.id))?;
+                    local.reachability = Reachability::Unknown;
                 }
                 crate::bytecode::Instruction::LoadLocal(local) => {
-                    let value = self
+                    let local = self
                         .locals
                         .get(&local.id)
                         .with_context(|| anyhow!("tried to load unknown local {}", local.id))?;
-                    self.stack.push(value.clone());
+                    self.stack.push(local.value.clone());
+                }
+                crate::bytecode::Instruction::Random(_) => {
+                    let n = self.pop()?.to_number()?;
+                    self.stack.push(Value::Number(self.rng.f64() % n));
                 }
             }
         }

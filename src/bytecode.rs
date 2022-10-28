@@ -26,6 +26,7 @@ pub enum OpCode {
     PushLocalOp,
     PopLocalOp,
     LoadLocalOp,
+    Random,
 }
 
 impl OpCode {
@@ -51,6 +52,7 @@ impl OpCode {
             18 => OpCode::from(PushLocalOp),
             19 => OpCode::from(PopLocalOp),
             20 => OpCode::from(LoadLocalOp),
+            21 => OpCode::from(Random),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -85,6 +87,7 @@ pub enum Instruction {
     PushLocal,
     PopLocal,
     LoadLocal,
+    Random,
 }
 
 #[enum_dispatch]
@@ -330,6 +333,8 @@ impl InstructionImpl for LoadLocal {
     }
 }
 
+dataless_opcode!(Random, 21);
+
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Chunk {
     pub data: Vec<u8>,
@@ -348,5 +353,32 @@ impl Chunk {
         let op_code = OpCode::from_byte(*code)?;
         let (ins, off) = op_code.read(&self.data[(index + 1)..])?;
         Ok((ins, off + 1))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Result<Instruction>> + '_ {
+        self.iter_fn(0)
+    }
+
+    pub fn iter_fn(&self, mut index: usize) -> impl Iterator<Item = Result<Instruction>> + '_ {
+        use genawaiter::yield_;
+        genawaiter::rc::gen!({
+            loop {
+                let (ins, off) = match self.read(index) {
+                    Ok(res) => res,
+                    Err(err) => {
+                        yield_!(Err(err));
+                        return;
+                    }
+                };
+
+                index += off;
+                yield_!(Ok(ins));
+
+                if index == self.data.len() {
+                    return;
+                }
+            }
+        })
+        .into_iter()
     }
 }
