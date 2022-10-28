@@ -27,6 +27,9 @@ pub enum OpCode {
     PopLocalOp,
     LoadLocalOp,
     Random,
+    CallOp,
+    FunctionOp,
+    EndFunction,
 }
 
 impl OpCode {
@@ -53,6 +56,9 @@ impl OpCode {
             19 => OpCode::from(PopLocalOp),
             20 => OpCode::from(LoadLocalOp),
             21 => OpCode::from(Random),
+            22 => OpCode::from(CallOp),
+            23 => OpCode::from(FunctionOp),
+            24 => OpCode::from(EndFunction),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -88,6 +94,9 @@ pub enum Instruction {
     PopLocal,
     LoadLocal,
     Random,
+    Call,
+    Function,
+    EndFunction,
 }
 
 #[enum_dispatch]
@@ -334,6 +343,72 @@ impl InstructionImpl for LoadLocal {
 }
 
 dataless_opcode!(Random, 21);
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct CallOp;
+
+impl OpCodeImpl for CallOp {
+    fn byte(self) -> u8 {
+        22
+    }
+
+    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+        if buffer.len() < 1 {
+            Err(anyhow!("incomplete call at end of bytecode"))
+        } else {
+            Ok((Instruction::from(Call { n_args: buffer[0] }), 1))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub n_args: u8,
+}
+
+impl InstructionImpl for Call {
+    fn op_code(&self) -> OpCode {
+        OpCode::from(CallOp)
+    }
+
+    fn write(&self, chunk: &mut Chunk) {
+        chunk.data.push(self.n_args);
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct FunctionOp;
+
+impl OpCodeImpl for FunctionOp {
+    fn byte(self) -> u8 {
+        23
+    }
+
+    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+        if buffer.len() < 1 {
+            Err(anyhow!("incomplete function at end of bytecode"))
+        } else {
+            Ok((Instruction::from(Function { n_args: buffer[0] }), 1))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub n_args: u8,
+}
+
+impl InstructionImpl for Function {
+    fn op_code(&self) -> OpCode {
+        OpCode::from(FunctionOp)
+    }
+
+    fn write(&self, chunk: &mut Chunk) {
+        chunk.data.push(self.n_args);
+    }
+}
+
+dataless_opcode!(EndFunction, 24);
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Chunk {

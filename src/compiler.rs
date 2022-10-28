@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::bytecode::{
-    Add, And, BooleanLit, Chunk, Divide, Equal, Greater, GreaterEqual, Instruction, Less,
-    LessEqual, LoadLocal, Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal,
-    Random, Subtract,
+    Add, And, BooleanLit, Call, Chunk, Divide, EndFunction, Equal, Function, Greater, GreaterEqual,
+    Instruction, Less, LessEqual, LoadLocal, Multiply, Negate, Not, NotEqual, NumberLit, Or,
+    PopLocal, PushLocal, Random, Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -279,8 +279,13 @@ impl Compiler {
             .next()
             .context("internal parsing error, expected primary")?;
         self.primary(pri)?;
-        for _ in inner {
-            todo!()
+        for call_args in inner {
+            let mut n_args = 0;
+            for arg in call_args.into_inner() {
+                self.expression(arg)?;
+                n_args += 1;
+            }
+            self.chunk.push(Call { n_args });
         }
         Ok(())
     }
@@ -298,7 +303,7 @@ impl Compiler {
                 },
             }),
             Rule::identifier => self.identifier(pri)?,
-            Rule::function => todo!(),
+            Rule::function => self.function(pri)?,
             Rule::internal_random => self.random(pri)?,
             _ => {
                 return Err(anyhow!(
@@ -316,16 +321,44 @@ impl Compiler {
         Ok(())
     }
 
+    fn function(&mut self, func: Pair<Rule>) -> Result<()> {
+        let mut inner = func.into_inner();
+        let parameters = inner
+            .next()
+            .context("internal parsing error, expected function parameters")?;
+        let expr = inner
+            .next()
+            .context("internal parsing error, expected function body")?;
+
+        let mut args = Vec::new();
+        for arg in parameters.into_inner().rev() {
+            let local_id = self.add_local(arg.as_str())?;
+            args.push(PushLocal { id: local_id });
+        }
+
+        self.chunk.push(Function {
+            n_args: args
+                .len()
+                .try_into()
+                .context("too many arguments to function")?,
+        });
+        self.begin_scope();
+        for arg in args {
+            self.chunk.push(arg);
+        }
+        self.expression(expr)?;
+        self.end_scope()?;
+        self.chunk.push(EndFunction);
+
+        Ok(())
+    }
+
     fn random(&mut self, rand: Pair<Rule>) -> Result<()> {
-        let number_pair = rand
+        let expr = rand
             .into_inner()
             .next()
             .context("internal parsing error, expected random number")?;
-        let number = number_pair
-            .as_str()
-            .parse()
-            .context("error parsing number")?;
-        self.chunk.push(NumberLit { value: number });
+        self.expression(expr)?;
         self.chunk.push(Random);
         Ok(())
     }

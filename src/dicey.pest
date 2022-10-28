@@ -37,6 +37,6 @@ boolean = @{ "true" | "false" }
 identifier = @{ XID_START ~ XID_CONTINUE* }
 function = { "fn" ~ parameters ~ expression }
 parameters = { "(" ~ ( identifier ~ "," )* ~ ")" }
-internal_random = { "__random" ~ number }
+internal_random = { "__random" ~ expression }
 
 file = { SOI ~ declaration* ~ expression ~ EOI }

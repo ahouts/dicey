@@ -1,4 +1,4 @@
-use crate::bytecode::Chunk;
+use crate::bytecode::{Chunk, InstructionImpl, OpCode};
 use anyhow::{anyhow, Context, Result};
 use fastrand::Rng;
 use std::collections::BTreeMap;
@@ -8,6 +8,7 @@ use std::fmt;
 pub enum Value {
     Number(f64),
     Boolean(bool),
+    Function { n_args: u8, loc: usize },
 }
 
 impl Value {
@@ -22,6 +23,13 @@ impl Value {
         match self {
             Value::Boolean(value) => Ok(value),
             unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
+        }
+    }
+
+    fn to_func(self) -> Result<(u8, usize)> {
+        match self {
+            Value::Function { n_args, loc } => Ok((n_args, loc)),
+            unexpected => Err(anyhow!("expected function, found {unexpected}")),
         }
     }
 }
@@ -43,6 +51,7 @@ impl fmt::Display for Value {
         match self {
             Value::Number(value) => write!(f, "{value}"),
             Value::Boolean(value) => write!(f, "{value}"),
+            Value::Function { .. } => write!(f, "<function>"),
         }
     }
 }
@@ -63,8 +72,9 @@ struct Local {
 pub struct Vm {
     stack: Vec<Value>,
     locals: BTreeMap<u32, Local>,
+    return_addrs: Vec<usize>,
     pc: usize,
-    rng: Rng,
+    pub(crate) rng: Rng,
 }
 
 impl Vm {
@@ -76,6 +86,7 @@ impl Vm {
             }
             let (ins, off) = chunk.read(self.pc)?;
             self.pc += off;
+            log::trace!("{:10} {:?} {:?}", self.pc, self.stack, ins);
             match ins {
                 crate::bytecode::Instruction::NumberLit(lit) => {
                     self.stack.push(Value::Number(lit.value));
@@ -179,8 +190,51 @@ impl Vm {
                     self.stack.push(local.value.clone());
                 }
                 crate::bytecode::Instruction::Random(_) => {
-                    let n = self.pop()?.to_number()?;
-                    self.stack.push(Value::Number(self.rng.f64() % n));
+                    let n = self.pop()?.to_number()? as u64;
+                    self.stack.push(Value::Number((self.rng.u64(1..=n)) as f64));
+                }
+                crate::bytecode::Instruction::Call(call) => {
+                    let mut args = Vec::new();
+                    for _ in 0..call.n_args {
+                        args.push(self.pop().context("not enough arguments for call")?);
+                    }
+                    let (n_args, offset) = self
+                        .pop()
+                        .context("tried to call with empty stack")?
+                        .to_func()?;
+                    if n_args != call.n_args {
+                        return Err(anyhow!(
+                            "called function with incorrect number of arguments"
+                        ));
+                    }
+                    self.return_addrs.push(self.pc);
+                    self.pc = offset;
+                    args.into_iter().rev().for_each(|arg| self.stack.push(arg));
+                }
+                crate::bytecode::Instruction::Function(func) => {
+                    self.stack.push(Value::Function {
+                        n_args: func.n_args,
+                        loc: self.pc,
+                    });
+                    let mut callstack_depth = 1;
+                    loop {
+                        let (ins, off) = chunk.read(self.pc)?;
+                        self.pc += off;
+                        callstack_depth += match ins.op_code() {
+                            OpCode::FunctionOp(_) => 1,
+                            OpCode::EndFunction(_) => -1,
+                            _ => 0,
+                        };
+                        if callstack_depth == 0 {
+                            break;
+                        }
+                    }
+                }
+                crate::bytecode::Instruction::EndFunction(_) => {
+                    self.pc = self
+                        .return_addrs
+                        .pop()
+                        .context("returned when not in function call")?;
                 }
             }
         }
