@@ -1,0 +1,41 @@
+WHITESPACE = _{ WHITE_SPACE }
+
+declaration = { "let" ~ identifier ~ "=" ~ expression ~ ";" }
+expression = { ( block | logic_or ) }
+block = { "{" ~ declaration* ~ expression ~ "}" }
+
+logic_or = { logic_and ~ ( "or" ~ logic_and )* }
+logic_and = { equality ~ ( "and" ~ equality )* }
+
+equality = { comparison ~ ( equality_op ~ comparison )* }
+equality_op = { ( "==" | "!=" ) }
+
+comparison = { term ~ ( comparison_op ~ term )* }
+comparison_op = { ( ">=" | ">" | "<=" | "<" ) }
+
+term = { factor ~ ( term_op ~ factor )* }
+term_op = { ( "-" | "+" ) }
+
+factor = { unary ~ ( factor_op ~ unary )* }
+factor_op = { ( "/" | "*" ) }
+
+unary = { unary_op* ~ call }
+unary_op = { ( "!" | "-" ) }
+
+call = { ( primary ~ ( "(" ~ call_args ~ ")" )* ) }
+call_args = { ( expression ~ "," )* }
+
+primary = _{ ( number | boolean | function | identifier | "(" ~ expression ~ ")" ) }
+number = @{
+    (
+          ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+        ~ ("." ~ ASCII_DIGIT*)?
+        | ("." ~ ASCII_DIGIT+)
+    )
+}
+boolean = @{ "true" | "false" }
+identifier = @{ XID_START ~ XID_CONTINUE* }
+function = { "fn" ~ parameters ~ expression }
+parameters = { "(" ~ ( identifier ~ "," )* ~ ")" }
+
+file = { SOI ~ declaration* ~ expression ~ EOI }
