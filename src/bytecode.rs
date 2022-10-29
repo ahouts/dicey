@@ -450,31 +450,4 @@ impl Chunk {
         let (ins, off) = op_code.read(&self.data[(index + 1)..])?;
         Ok((ins, off + 1))
     }
-
-    pub fn iter(&self) -> impl Iterator<Item = Result<Instruction>> + '_ {
-        self.iter_fn(0)
-    }
-
-    pub fn iter_fn(&self, mut index: usize) -> impl Iterator<Item = Result<Instruction>> + '_ {
-        use genawaiter::yield_;
-        genawaiter::rc::gen!({
-            loop {
-                let (ins, off) = match self.read(index) {
-                    Ok(res) => res,
-                    Err(err) => {
-                        yield_!(Err(err));
-                        return;
-                    }
-                };
-
-                index += off;
-                yield_!(Ok(ins));
-
-                if index == self.data.len() {
-                    return;
-                }
-            }
-        })
-        .into_iter()
-    }
 }
