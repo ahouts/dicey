@@ -30,6 +30,11 @@ pub enum OpCode {
     CallOp,
     FunctionOp,
     EndFunction,
+    BeginIf,
+    EndIf,
+    If,
+    BeginElse,
+    EndElse,
 }
 
 impl OpCode {
@@ -59,6 +64,11 @@ impl OpCode {
             22 => OpCode::from(CallOp),
             23 => OpCode::from(FunctionOp),
             24 => OpCode::from(EndFunction),
+            25 => OpCode::from(BeginIf),
+            26 => OpCode::from(EndIf),
+            27 => OpCode::from(If),
+            28 => OpCode::from(BeginElse),
+            29 => OpCode::from(EndElse),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -97,6 +107,11 @@ pub enum Instruction {
     Call,
     Function,
     EndFunction,
+    BeginIf,
+    EndIf,
+    If,
+    BeginElse,
+    EndElse,
 }
 
 #[enum_dispatch]
@@ -414,6 +429,12 @@ dataless_opcode!(EndFunction, 24);
 pub struct Chunk {
     pub data: Vec<u8>,
 }
+
+dataless_opcode!(BeginIf, 25);
+dataless_opcode!(EndIf, 26);
+dataless_opcode!(If, 27);
+dataless_opcode!(BeginElse, 28);
+dataless_opcode!(EndElse, 29);
 
 impl Chunk {
     pub fn push(&mut self, ins: impl Into<Instruction>) {

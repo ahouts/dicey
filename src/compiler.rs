@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::bytecode::{
-    Add, And, BooleanLit, Call, Chunk, Divide, EndFunction, Equal, Function, Greater, GreaterEqual,
-    Instruction, Less, LessEqual, LoadLocal, Multiply, Negate, Not, NotEqual, NumberLit, Or,
-    PopLocal, PushLocal, Random, Subtract,
+    Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
+    Equal, Function, Greater, GreaterEqual, If, Instruction, Less, LessEqual, LoadLocal, Multiply,
+    Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Random, Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -116,6 +116,7 @@ impl Compiler {
             .next()
             .context("internal parsing error, expected expression to have inner value")?;
         match inner.as_rule() {
+            Rule::if_statement => self.if_statement(inner),
             Rule::block => self.block(inner),
             Rule::logic_or => self.logic_or(inner),
             unexpected => {
@@ -126,6 +127,32 @@ impl Compiler {
                 ));
             }
         }
+    }
+
+    fn if_statement(&mut self, if_stmt: Pair<Rule>) -> Result<()> {
+        let mut inner = if_stmt.into_inner();
+        let cond = inner
+            .next()
+            .context("internal parsing error, expected if condition")?;
+        let body = inner
+            .next()
+            .context("internal parsing error, expected if body")?;
+        let els = inner
+            .next()
+            .context("internal parsing error, expected if else")?;
+
+        self.expression(cond)?;
+        self.chunk.push(If);
+
+        self.chunk.push(BeginIf);
+        self.expression(body)?;
+        self.chunk.push(EndIf);
+
+        self.chunk.push(BeginElse);
+        self.expression(els)?;
+        self.chunk.push(EndElse);
+
+        Ok(())
     }
 
     fn logic_or(&mut self, or: Pair<Rule>) -> Result<()> {

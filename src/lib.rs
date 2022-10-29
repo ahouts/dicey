@@ -73,6 +73,29 @@ mod tests {
         );
     }
 
+    #[test]
+    fn calls_as_numbers() {
+        assert_result(r#"d12 + d6"#, Value::Number(12.));
+    }
+
+    #[test]
+    fn if_condition() {
+        assert_result(r#"if 5 > 3 then 10 else 20"#, Value::Number(10.));
+    }
+
+    #[test]
+    fn else_condition() {
+        assert_result(r#"if 2 > 3 then 10 else 20"#, Value::Number(20.));
+    }
+
+    #[test]
+    fn nested_if_else() {
+        assert_result(
+            r#"if 2 > 3 then if 5 < 3 then 10 else 20 else if 5 > 3 then 30 else 40"#,
+            Value::Number(30.),
+        );
+    }
+
     fn assert_result(code: &str, value: Value) {
         init();
         let mut tmp = String::from(PRELUDE);

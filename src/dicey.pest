@@ -1,8 +1,9 @@
 WHITESPACE = _{ WHITE_SPACE }
 
 declaration = { "let" ~ identifier ~ "=" ~ expression ~ ";" }
-expression = { ( block | logic_or ) }
+expression = { ( if_statement | block | logic_or ) }
 block = { "{" ~ declaration* ~ expression ~ "}" }
+if_statement = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }
 
 logic_or = { logic_and ~ ( "or" ~ logic_and )* }
 logic_and = { equality ~ ( "and" ~ equality )* }
