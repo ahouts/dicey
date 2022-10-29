@@ -1,3 +1,13 @@
+#![deny(unsafe_code)]
+#![deny(
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
+#![allow(clippy::missing_errors_doc)]
+
 mod bytecode;
 mod compiler;
 mod vm;
@@ -17,6 +27,7 @@ let d100 = fn () nd(100,);
 "#;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use once_cell::sync::OnceCell;
 
@@ -103,6 +114,6 @@ mod tests {
         let chunk = compiler::Compiler::default().compile(tmp.as_str()).unwrap();
         let mut vm = Vm::default();
         vm.rng.seed(12345);
-        assert_eq!(vm.execute(&chunk).unwrap(), value)
+        assert_eq!(vm.execute(&chunk).unwrap(), value);
     }
 }

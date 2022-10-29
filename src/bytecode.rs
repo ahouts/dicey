@@ -38,37 +38,37 @@ pub enum OpCode {
 }
 
 impl OpCode {
-    fn from_byte(byte: u8) -> Result<OpCode> {
+    fn from_byte(byte: u8) -> Result<Self> {
         Ok(match byte {
-            1 => OpCode::from(NumberLitOp),
-            2 => OpCode::from(Add),
-            3 => OpCode::from(Subtract),
-            4 => OpCode::from(Multiply),
-            5 => OpCode::from(Divide),
-            6 => OpCode::from(Equal),
-            7 => OpCode::from(NotEqual),
-            8 => OpCode::from(GreaterEqual),
-            9 => OpCode::from(Greater),
-            10 => OpCode::from(LessEqual),
-            11 => OpCode::from(Less),
-            12 => OpCode::from(Pop),
-            13 => OpCode::from(Or),
-            14 => OpCode::from(And),
-            15 => OpCode::from(Negate),
-            16 => OpCode::from(Not),
-            17 => OpCode::from(BooleanLitOp),
-            18 => OpCode::from(PushLocalOp),
-            19 => OpCode::from(PopLocalOp),
-            20 => OpCode::from(LoadLocalOp),
-            21 => OpCode::from(Random),
-            22 => OpCode::from(CallOp),
-            23 => OpCode::from(FunctionOp),
-            24 => OpCode::from(EndFunction),
-            25 => OpCode::from(BeginIf),
-            26 => OpCode::from(EndIf),
-            27 => OpCode::from(If),
-            28 => OpCode::from(BeginElse),
-            29 => OpCode::from(EndElse),
+            1 => Self::from(NumberLitOp),
+            2 => Self::from(Add),
+            3 => Self::from(Subtract),
+            4 => Self::from(Multiply),
+            5 => Self::from(Divide),
+            6 => Self::from(Equal),
+            7 => Self::from(NotEqual),
+            8 => Self::from(GreaterEqual),
+            9 => Self::from(Greater),
+            10 => Self::from(LessEqual),
+            11 => Self::from(Less),
+            12 => Self::from(Pop),
+            13 => Self::from(Or),
+            14 => Self::from(And),
+            15 => Self::from(Negate),
+            16 => Self::from(Not),
+            17 => Self::from(BooleanLitOp),
+            18 => Self::from(PushLocalOp),
+            19 => Self::from(PopLocalOp),
+            20 => Self::from(LoadLocalOp),
+            21 => Self::from(Random),
+            22 => Self::from(CallOp),
+            23 => Self::from(FunctionOp),
+            24 => Self::from(EndFunction),
+            25 => Self::from(BeginIf),
+            26 => Self::from(EndIf),
+            27 => Self::from(If),
+            28 => Self::from(BeginElse),
+            29 => Self::from(EndElse),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -212,7 +212,7 @@ impl OpCodeImpl for BooleanLitOp {
     }
 
     fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
-        if buffer.len() < 1 {
+        if buffer.is_empty() {
             Err(anyhow!("incomplete boolean literal at end of bytecode"))
         } else {
             Ok((
@@ -368,7 +368,7 @@ impl OpCodeImpl for CallOp {
     }
 
     fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
-        if buffer.len() < 1 {
+        if buffer.is_empty() {
             Err(anyhow!("incomplete call at end of bytecode"))
         } else {
             Ok((Instruction::from(Call { n_args: buffer[0] }), 1))
@@ -400,7 +400,7 @@ impl OpCodeImpl for FunctionOp {
     }
 
     fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
-        if buffer.len() < 1 {
+        if buffer.is_empty() {
             Err(anyhow!("incomplete function at end of bytecode"))
         } else {
             Ok((Instruction::from(Function { n_args: buffer[0] }), 1))

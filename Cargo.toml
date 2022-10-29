@@ -11,6 +11,7 @@ enum_dispatch = "0.3"
 anyhow = "1"
 fastrand = "1"
 log = "0.4"
+num = "0.4"
 
 [dev-dependencies]
 simple_logger = "4"

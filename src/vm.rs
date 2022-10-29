@@ -1,10 +1,11 @@
 use crate::bytecode::{Call, Chunk, Instruction, InstructionImpl, OpCode};
 use anyhow::{anyhow, Context, Result};
 use fastrand::Rng;
+use num::ToPrimitive;
 use std::collections::BTreeMap;
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
@@ -15,28 +16,28 @@ pub enum Value {
 impl Value {
     fn to_number(self) -> Result<f64> {
         match self {
-            Value::Number(n) => Ok(n),
+            Self::Number(n) => Ok(n),
             unexpected => Err(anyhow!("expected number, found {unexpected}")),
         }
     }
 
     fn to_bool(self) -> Result<bool> {
         match self {
-            Value::Boolean(value) => Ok(value),
+            Self::Boolean(value) => Ok(value),
             unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
         }
     }
 
     fn to_func(self) -> Result<(u8, usize)> {
         match self {
-            Value::Function { n_args, loc } => Ok((n_args, loc)),
+            Self::Function { n_args, loc } => Ok((n_args, loc)),
             unexpected => Err(anyhow!("expected function, found {unexpected}")),
         }
     }
 
     fn to_if_cond(self) -> Result<bool> {
         match self {
-            Value::IfCond { do_if } => Ok(do_if),
+            Self::IfCond { do_if } => Ok(do_if),
             unexpected => Err(anyhow!("expected if cond, found {unexpected}")),
         }
     }
@@ -44,23 +45,23 @@ impl Value {
 
 impl From<f64> for Value {
     fn from(value: f64) -> Self {
-        Value::Number(value)
+        Self::Number(value)
     }
 }
 
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
-        Value::Boolean(value)
+        Self::Boolean(value)
     }
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Number(value) => write!(f, "{value}"),
-            Value::Boolean(value) => write!(f, "{value}"),
-            Value::Function { .. } => write!(f, "<function>"),
-            Value::IfCond { do_if } => write!(f, "IfCond {{ do_if: {do_if} }}"),
+            Self::Number(value) => write!(f, "{value}"),
+            Self::Boolean(value) => write!(f, "{value}"),
+            Self::Function { .. } => write!(f, "<function>"),
+            Self::IfCond { do_if } => write!(f, "IfCond {{ do_if: {do_if} }}"),
         }
     }
 }
@@ -105,13 +106,14 @@ impl Vm {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn execute_ins(
         &mut self,
         ins: crate::bytecode::Instruction,
         chunk: &Chunk,
     ) -> Result<(), anyhow::Error> {
         log::trace!("{:10} {:?} {:?}", self.pc, self.stack, ins);
-        Ok(match ins {
+        match ins {
             crate::bytecode::Instruction::NumberLit(lit) => {
                 self.stack.push(Value::Number(lit.value));
             }
@@ -211,14 +213,21 @@ impl Vm {
                     .locals
                     .get(&local.id)
                     .with_context(|| anyhow!("tried to load unknown local {}", local.id))?;
-                self.stack.push(local.value.clone());
+                self.stack.push(local.value);
             }
             crate::bytecode::Instruction::Random(_) => {
-                let n = self.pop_number(chunk)? as u64;
-                self.stack.push(Value::Number((self.rng.u64(1..=n)) as f64));
+                let n = self
+                    .pop_number(chunk)?
+                    .to_u64()
+                    .context("requested random number too big")?;
+                self.stack.push(Value::Number(
+                    (self.rng.u64(1..=n))
+                        .to_f64()
+                        .context("requested random number too big")?,
+                ));
             }
             crate::bytecode::Instruction::Call(call) => {
-                self.call(call)?;
+                self.call(&call)?;
             }
             crate::bytecode::Instruction::Function(func) => {
                 self.stack.push(Value::Function {
@@ -267,10 +276,11 @@ impl Vm {
                 }
             }
             crate::bytecode::Instruction::EndElse(_) => {}
-        })
+        };
+        Ok(())
     }
 
-    fn call(&mut self, call: Call) -> Result<(), anyhow::Error> {
+    fn call(&mut self, call: &Call) -> Result<(), anyhow::Error> {
         let mut args = Vec::new();
         for _ in 0..call.n_args {
             args.push(self.pop().context("not enough arguments for call")?);
@@ -311,7 +321,7 @@ impl Vm {
     fn delegate_no_arg_func(&mut self, value: Value, chunk: &Chunk) -> Result<Value> {
         self.stack.push(value);
         let depth = self.return_addrs.len();
-        self.call(Call { n_args: 0 })?;
+        self.call(&Call { n_args: 0 })?;
         loop {
             if depth == self.return_addrs.len() {
                 return self.pop();

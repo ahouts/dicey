@@ -119,13 +119,11 @@ impl Compiler {
             Rule::if_statement => self.if_statement(inner),
             Rule::block => self.block(inner),
             Rule::logic_or => self.logic_or(inner),
-            unexpected => {
-                return Err(anyhow!(
-                    "unexpected {:?} at {}",
-                    unexpected,
-                    inner.as_span().as_str()
-                ));
-            }
+            unexpected => Err(anyhow!(
+                "unexpected {:?} at {}",
+                unexpected,
+                inner.as_span().as_str()
+            )),
         }
     }
 
@@ -329,7 +327,7 @@ impl Compiler {
                     unexpected => return Err(anyhow!("invalid boolean {unexpected}")),
                 },
             }),
-            Rule::identifier => self.identifier(pri)?,
+            Rule::identifier => self.identifier(&pri)?,
             Rule::function => self.function(pri)?,
             Rule::internal_random => self.random(pri)?,
             _ => {
@@ -342,7 +340,7 @@ impl Compiler {
         Ok(())
     }
 
-    fn identifier(&mut self, id: Pair<Rule>) -> Result<()> {
+    fn identifier(&mut self, id: &Pair<Rule>) -> Result<()> {
         let local_id = self.resolve_local(id.as_str())?;
         self.chunk.push(LoadLocal { id: local_id });
         Ok(())
