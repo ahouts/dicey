@@ -14,7 +14,7 @@ pub enum Value {
 }
 
 impl Value {
-    fn to_number(self) -> Result<f64> {
+    pub fn to_number(self) -> Result<f64> {
         match self {
             Self::Number(n) => Ok(n),
             unexpected => Err(anyhow!("expected number, found {unexpected}")),
