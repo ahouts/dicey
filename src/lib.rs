@@ -19,17 +19,17 @@ pub static PRELUDE: &str = r#"
 let nd = |n, d|
     if n == 0 
         then 0 
-        else __random d + nd(n - 1, d);
+        else __random(d) + nd(n - 1, d);
 
 let min = |a, b| {
     let av = a + 0;
     let bv = b + 0;
-    if a < b then a else b
+    if av < bv then av else bv
 };
 let max = |a, b| {
     let av = a + 0;
     let bv = b + 0;
-    if a > b then a else b
+    if av > bv then av else bv
 };
 
 let nd4 = |n| nd(n,4);
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn nd() {
-        assert_result(r#"nd12(5,)"#, Value::Number(25.));
+        assert_result(r#"nd12(5,)"#, Value::Number(42.));
     }
 
     #[test]
@@ -148,7 +148,11 @@ mod tests {
     #[test]
     fn min_max() {
         assert_result(r#"min(max(17, 13), 23)"#, Value::Number(17.));
-        assert_result(r#"min(d20, d20)"#, Value::Number(18.));
+    }
+
+    #[test]
+    fn min_dice() {
+        assert_result(r#"min(d20, d20)"#, Value::Number(5.));
     }
 
     fn assert_result(code: &str, value: Value) {

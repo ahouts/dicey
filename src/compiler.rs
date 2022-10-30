@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::bytecode::{
     Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
     Equal, Function, Greater, GreaterEqual, If, Instruction, Less, LessEqual, LoadLocal, Multiply,
-    Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Random, Subtract,
+    Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Subtract, RANDOM_BUILTIN_LITERAL_ID,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -27,8 +27,12 @@ pub struct Compiler {
 
 impl Default for Compiler {
     fn default() -> Self {
+        let mut global_scope = Scope::default();
+        global_scope
+            .locals
+            .insert(String::from("__random"), RANDOM_BUILTIN_LITERAL_ID);
         Self {
-            scopes: vec![Scope::default()],
+            scopes: vec![global_scope],
             next_local_id: 0,
             chunk: Chunk::default(),
         }
@@ -330,7 +334,6 @@ impl Compiler {
             }),
             Rule::identifier => self.identifier(&pri)?,
             Rule::function => self.function(pri)?,
-            Rule::internal_random => self.random(pri)?,
             _ => {
                 return Err(anyhow!(
                     "internal parsing error, unexpected {}",
@@ -376,16 +379,6 @@ impl Compiler {
         self.end_scope()?;
         self.chunk.push(EndFunction);
 
-        Ok(())
-    }
-
-    fn random(&mut self, rand: Pair<Rule>) -> Result<()> {
-        let expr = rand
-            .into_inner()
-            .next()
-            .context("internal parsing error, expected random number")?;
-        self.expression(expr)?;
-        self.chunk.push(Random);
         Ok(())
     }
 

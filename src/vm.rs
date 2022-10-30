@@ -10,6 +10,7 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     Function { n_args: u8, loc: usize },
+    Random,
     IfCond { do_if: bool },
 }
 
@@ -80,7 +81,7 @@ impl fmt::Display for Value {
         match self {
             Self::Number(value) => write!(f, "{value}"),
             Self::Boolean(value) => write!(f, "{value}"),
-            Self::Function { .. } => write!(f, "<function>"),
+            Self::Function { .. } | Self::Random => write!(f, "<function>"),
             Self::IfCond { do_if } => write!(f, "IfCond {{ do_if: {do_if} }}"),
         }
     }
@@ -98,13 +99,39 @@ struct Local {
     reachability: Reachability,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
+struct FuncScope {
+    locals: BTreeMap<u32, Local>,
+    return_addr: usize,
+}
+
+#[derive(Debug)]
 pub struct Vm {
     stack: Vec<Value>,
-    locals: BTreeMap<u32, Local>,
-    return_addrs: Vec<usize>,
+    globals: BTreeMap<u32, Local>,
+    scopes: Vec<FuncScope>,
     pc: usize,
     pub(crate) rng: Rng,
+}
+
+impl Default for Vm {
+    fn default() -> Self {
+        let mut globals = BTreeMap::new();
+        globals.insert(
+            crate::bytecode::RANDOM_BUILTIN_LITERAL_ID,
+            Local {
+                value: Value::Random,
+                reachability: Reachability::Stack,
+            },
+        );
+        Self {
+            stack: Vec::new(),
+            globals,
+            scopes: Vec::new(),
+            pc: 0,
+            rng: Rng::default(),
+        }
+    }
 }
 
 impl Vm {
@@ -122,7 +149,7 @@ impl Vm {
 
         let result = match result {
             result @ Value::Function { n_args: 0, .. } => {
-                self.delegate_no_arg_func(result, chunk)?
+                self.delegate_to_no_arg_func(result, chunk)?
             }
             result => result,
         };
@@ -166,33 +193,33 @@ impl Vm {
                 self.stack.push(Value::Number(a / b));
             }
             crate::bytecode::Instruction::Equal(_) => {
-                let b = self.pop()?;
-                let a = self.pop()?;
+                let b = self.pop_comparable(chunk)?;
+                let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a == b));
             }
             crate::bytecode::Instruction::NotEqual(_) => {
-                let b = self.pop()?;
-                let a = self.pop()?;
+                let b = self.pop_comparable(chunk)?;
+                let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a != b));
             }
             crate::bytecode::Instruction::GreaterEqual(_) => {
-                let b = self.pop()?;
-                let a = self.pop()?;
+                let b = self.pop_comparable(chunk)?;
+                let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a >= b));
             }
             crate::bytecode::Instruction::Greater(_) => {
-                let b = self.pop()?;
-                let a = self.pop()?;
+                let b = self.pop_comparable(chunk)?;
+                let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a > b));
             }
             crate::bytecode::Instruction::LessEqual(_) => {
-                let b = self.pop()?;
-                let a = self.pop()?;
+                let b = self.pop_comparable(chunk)?;
+                let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a <= b));
             }
             crate::bytecode::Instruction::Less(_) => {
-                let b = self.pop()?;
-                let a = self.pop()?;
+                let b = self.pop_comparable(chunk)?;
+                let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a < b));
             }
             crate::bytecode::Instruction::Pop(_) => {
@@ -221,41 +248,17 @@ impl Vm {
             }
             crate::bytecode::Instruction::PushLocal(local) => {
                 let value = self.pop()?;
-                self.locals.insert(
-                    local.id,
-                    Local {
-                        value,
-                        reachability: Reachability::Stack,
-                    },
-                );
+                self.push_local(local.id, value);
             }
             crate::bytecode::Instruction::PopLocal(local) => {
-                let local = self
-                    .locals
-                    .get_mut(&local.id)
-                    .with_context(|| anyhow!("tried to pop unknown local {}", local.id))?;
-                local.reachability = Reachability::Unknown;
+                self.unstack_local(local.id)?;
             }
             crate::bytecode::Instruction::LoadLocal(local) => {
-                let local = self
-                    .locals
-                    .get(&local.id)
-                    .with_context(|| anyhow!("tried to load unknown local {}", local.id))?;
-                self.stack.push(local.value);
-            }
-            crate::bytecode::Instruction::Random(_) => {
-                let n = self
-                    .pop_number(chunk)?
-                    .to_u64()
-                    .context("requested random number too big")?;
-                self.stack.push(Value::Number(
-                    (self.rng.u64(1..=n))
-                        .to_f64()
-                        .context("requested random number too big")?,
-                ));
+                let value = self.get_local(local.id)?;
+                self.stack.push(value);
             }
             crate::bytecode::Instruction::Call(call) => {
-                self.call(&call)?;
+                self.call(&call, chunk)?;
             }
             crate::bytecode::Instruction::Function(func) => {
                 self.stack.push(Value::Function {
@@ -278,9 +281,10 @@ impl Vm {
             }
             crate::bytecode::Instruction::EndFunction(_) => {
                 self.pc = self
-                    .return_addrs
+                    .scopes
                     .pop()
-                    .context("returned when not in function call")?;
+                    .context("returned when not in function call")?
+                    .return_addr;
             }
             crate::bytecode::Instruction::If(_) => {
                 if self.pop_bool(chunk)? {
@@ -308,7 +312,23 @@ impl Vm {
         Ok(())
     }
 
-    fn call(&mut self, call: &Call) -> Result<(), anyhow::Error> {
+    #[allow(clippy::equatable_if_let)]
+    fn call(&mut self, call: &Call, chunk: &Chunk) -> Result<(), anyhow::Error> {
+        if let (1, Some(&Value::Random)) = (call.n_args, self.stack.iter().rev().nth(1)) {
+            let n = self
+                .pop_number(chunk)?
+                .to_u64()
+                .context("requested random number too big")?;
+            self.pop()
+                .context("error popping stack when getting random number")?;
+            self.stack.push(Value::Number(
+                (self.rng.u64(1..=n))
+                    .to_f64()
+                    .context("requested random number too big")?,
+            ));
+            return Ok(());
+        }
+
         let mut args = Vec::new();
         for _ in 0..call.n_args {
             args.push(self.pop().context("not enough arguments for call")?);
@@ -322,7 +342,10 @@ impl Vm {
                 "called function with incorrect number of arguments"
             ));
         }
-        self.return_addrs.push(self.pc);
+        self.scopes.push(FuncScope {
+            locals: BTreeMap::new(),
+            return_addr: self.pc,
+        });
         self.pc = offset;
         args.into_iter().rev().for_each(|arg| self.stack.push(arg));
         Ok(())
@@ -332,7 +355,7 @@ impl Vm {
         match value {
             Value::Number(n) => Ok(n),
             Value::Function { n_args: 0, .. } => {
-                self.delegate_no_arg_func(value, chunk)?.to_number()
+                self.delegate_to_no_arg_func(value, chunk)?.to_number()
             }
             unexpected => Err(anyhow!("expected number, found {unexpected}")),
         }
@@ -341,17 +364,28 @@ impl Vm {
     fn as_bool(&mut self, chunk: &Chunk, value: Value) -> Result<bool> {
         match value {
             Value::Boolean(v) => Ok(v),
-            Value::Function { n_args: 0, .. } => self.delegate_no_arg_func(value, chunk)?.to_bool(),
+            Value::Function { n_args: 0, .. } => {
+                self.delegate_to_no_arg_func(value, chunk)?.to_bool()
+            }
             unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
         }
     }
 
-    fn delegate_no_arg_func(&mut self, value: Value, chunk: &Chunk) -> Result<Value> {
+    fn as_comparable(&mut self, chunk: &Chunk, value: Value) -> Result<Value> {
+        match value {
+            Value::Number(n) => Ok(Value::Number(n)),
+            Value::Boolean(v) => Ok(Value::Boolean(v)),
+            Value::Function { n_args: 0, .. } => self.delegate_to_no_arg_func(value, chunk),
+            unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
+        }
+    }
+
+    fn delegate_to_no_arg_func(&mut self, value: Value, chunk: &Chunk) -> Result<Value> {
         self.stack.push(value);
-        let depth = self.return_addrs.len();
-        self.call(&Call { n_args: 0 })?;
+        let depth = self.scopes.len();
+        self.call(&Call { n_args: 0 }, chunk)?;
         loop {
-            if depth == self.return_addrs.len() {
+            if depth == self.scopes.len() {
                 return self.pop();
             }
             if self.pc >= chunk.data.len() {
@@ -373,6 +407,11 @@ impl Vm {
     fn pop_bool(&mut self, chunk: &Chunk) -> Result<bool> {
         let tmp = self.pop()?;
         self.as_bool(chunk, tmp)
+    }
+
+    fn pop_comparable(&mut self, chunk: &Chunk) -> Result<Value> {
+        let tmp = self.pop()?;
+        self.as_comparable(chunk, tmp)
     }
 
     fn pop(&mut self) -> Result<Value> {
@@ -409,5 +448,48 @@ impl Vm {
                 _ => {}
             }
         }
+    }
+
+    fn push_local(&mut self, id: u32, value: Value) {
+        if let Some(local_scope) = self.scopes.last_mut() {
+            local_scope.locals.insert(
+                id,
+                Local {
+                    value,
+                    reachability: Reachability::Stack,
+                },
+            );
+        } else {
+            self.globals.insert(
+                id,
+                Local {
+                    value,
+                    reachability: Reachability::Stack,
+                },
+            );
+        }
+    }
+
+    fn get_local(&self, id: u32) -> Result<Value> {
+        for local_scope in self.scopes.iter().rev() {
+            if let Some(local) = local_scope.locals.get(&id) {
+                return Ok(local.value);
+            }
+        }
+        Ok(self.globals.get(&id).context("could not find local")?.value)
+    }
+
+    fn unstack_local(&mut self, id: u32) -> Result<()> {
+        for local_scope in self.scopes.iter_mut().rev() {
+            if let Some(local) = local_scope.locals.get_mut(&id) {
+                local.reachability = Reachability::Unknown;
+                return Ok(());
+            }
+        }
+        self.globals
+            .get_mut(&id)
+            .context("could not find local")?
+            .reachability = Reachability::Unknown;
+        Ok(())
     }
 }

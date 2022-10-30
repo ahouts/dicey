@@ -3,6 +3,8 @@ use std::mem::size_of;
 use anyhow::{anyhow, Context, Result};
 use enum_dispatch::enum_dispatch;
 
+pub const RANDOM_BUILTIN_LITERAL_ID: u32 = u32::MAX;
+
 #[enum_dispatch(OpCodeImpl)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum OpCode {
@@ -26,7 +28,6 @@ pub enum OpCode {
     PushLocalOp,
     PopLocalOp,
     LoadLocalOp,
-    Random,
     CallOp,
     FunctionOp,
     EndFunction,
@@ -60,7 +61,6 @@ impl OpCode {
             18 => Self::from(PushLocalOp),
             19 => Self::from(PopLocalOp),
             20 => Self::from(LoadLocalOp),
-            21 => Self::from(Random),
             22 => Self::from(CallOp),
             23 => Self::from(FunctionOp),
             24 => Self::from(EndFunction),
@@ -103,7 +103,6 @@ pub enum Instruction {
     PushLocal,
     PopLocal,
     LoadLocal,
-    Random,
     Call,
     Function,
     EndFunction,
@@ -356,8 +355,6 @@ impl InstructionImpl for LoadLocal {
         }
     }
 }
-
-dataless_opcode!(Random, 21);
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CallOp;
