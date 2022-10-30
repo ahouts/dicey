@@ -102,9 +102,10 @@ impl Compiler {
             .next()
             .context("internal parsing error, expected expression in declaration")?;
 
+        let local_id = self.add_local(ident.as_str())?;
+
         self.expression(expr)?;
 
-        let local_id = self.add_local(ident.as_str())?;
         self.chunk.push(PushLocal { id: local_id });
 
         Ok(())

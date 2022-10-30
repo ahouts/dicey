@@ -16,14 +16,32 @@ pub use compiler::Compiler;
 pub use vm::{Value, Vm};
 
 pub static PRELUDE: &str = r#"
-let nd = fn (n,) __random n;
-let d4 = fn () nd(4,);
-let d6 = fn () nd(6,);
-let d8 = fn () nd(8,);
-let d10 = fn () nd(10,);
-let d12 = fn () nd(12,);
-let d20 = fn () nd(20,);
-let d100 = fn () nd(100,);
+let nd =
+    fn (n, d,)
+        if n == 0 
+            then 0 
+            else __random d + nd(n - 1, d,);
+
+let nd4 = fn (n,) nd(n,4,);
+let d4 = fn () nd4(1,);
+
+let nd6 = fn (n,) nd(n,6,);
+let d6 = fn () nd6(1,);
+
+let nd8 = fn (n,) nd(n,8,);
+let d8 = fn () nd8(1,);
+
+let nd10 = fn (n,) nd(n,10,);
+let d10 = fn () nd10(1,);
+
+let nd12 = fn (n,) nd(n,12,);
+let d12 = fn () nd12(1,);
+
+let nd20 = fn (n,) nd(n,20,);
+let d20 = fn () nd20(1,);
+
+let nd100 = fn (n,) nd(n,100,);
+let d100 = fn () nd100(1,);
 "#;
 
 #[cfg(test)]
@@ -105,6 +123,11 @@ mod tests {
             r#"if 2 > 3 then if 5 < 3 then 10 else 20 else if 5 > 3 then 30 else 40"#,
             Value::Number(30.),
         );
+    }
+
+    #[test]
+    fn nd() {
+        assert_result(r#"nd12(5,)"#, Value::Number(25.));
     }
 
     fn assert_result(code: &str, value: Value) {
