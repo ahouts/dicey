@@ -22,6 +22,17 @@ let nd =
             then 0 
             else __random d + nd(n - 1, d,);
 
+let min = fn (a, b,) {
+    let av = a + 0;
+    let bv = b + 0;
+    if a < b then a else b
+};
+let max = fn (a, b,) {
+    let av = a + 0;
+    let bv = b + 0;
+    if a > b then a else b
+};
+
 let nd4 = fn (n,) nd(n,4,);
 let d4 = fn () nd4(1,);
 
@@ -133,6 +144,12 @@ mod tests {
     #[test]
     fn final_value_eval_no_arg_func() {
         assert_result(r#"d20"#, Value::Number(5.));
+    }
+
+    #[test]
+    fn min_max() {
+        assert_result(r#"min(max(17, 13,), 23,)"#, Value::Number(17.));
+        assert_result(r#"min(d20, d20,)"#, Value::Number(18.));
     }
 
     fn assert_result(code: &str, value: Value) {
