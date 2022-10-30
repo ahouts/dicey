@@ -24,7 +24,7 @@ unary = { unary_op* ~ call }
 unary_op = { ( "!" | "-" ) }
 
 call = { ( primary ~ ( "(" ~ call_args ~ ")" )* ) }
-call_args = { ( expression ~ "," )* }
+call_args = { ( expression ~ ("," ~ expression)* ~ ","? )? }
 
 primary = _{ ( number | boolean | function | internal_random | identifier | "(" ~ expression ~ ")" ) }
 number = @{
@@ -36,8 +36,8 @@ number = @{
 }
 boolean = @{ "true" | "false" }
 identifier = @{ XID_START ~ XID_CONTINUE* }
-function = { "fn" ~ parameters ~ expression }
-parameters = { "(" ~ ( identifier ~ "," )* ~ ")" }
+function = { parameters ~ expression }
+parameters = { "|" ~ ( identifier ~ ("," ~ identifier)* ~ ","? )? ~ "|" }
 internal_random = { "__random" ~ expression }
 
 file = { SOI ~ declaration* ~ expression ~ EOI }
