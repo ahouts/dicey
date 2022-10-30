@@ -99,6 +99,14 @@ impl Vm {
             self.execute_ins(ins, chunk)?;
         }
         let result = self.pop()?;
+
+        let result = match result {
+            result @ Value::Function { n_args: 0, .. } => {
+                self.delegate_no_arg_func(result, chunk)?
+            }
+            result => result,
+        };
+
         if self.stack.is_empty() {
             Ok(result)
         } else {

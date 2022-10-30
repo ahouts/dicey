@@ -130,6 +130,11 @@ mod tests {
         assert_result(r#"nd12(5,)"#, Value::Number(25.));
     }
 
+    #[test]
+    fn final_value_eval_no_arg_func() {
+        assert_result(r#"d20"#, Value::Number(5.));
+    }
+
     fn assert_result(code: &str, value: Value) {
         init();
         let mut tmp = String::from(PRELUDE);
