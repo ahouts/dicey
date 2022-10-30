@@ -5,7 +5,7 @@ use num::ToPrimitive;
 use std::collections::BTreeMap;
 use std::fmt;
 
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Copy, Clone)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
@@ -52,6 +52,26 @@ impl From<f64> for Value {
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Self::Boolean(value)
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Number(n1), Self::Number(n2)) => n1 == n2,
+            (Self::Boolean(b1), Self::Boolean(b2)) => b1 == b2,
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::Number(n1), Self::Number(n2)) => n1.partial_cmp(n2),
+            (Self::Boolean(b1), Self::Boolean(b2)) => b1.partial_cmp(b2),
+            _ => None,
+        }
     }
 }
 
