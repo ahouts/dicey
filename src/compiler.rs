@@ -336,6 +336,7 @@ impl Compiler {
             }),
             Rule::identifier => self.identifier(&pri)?,
             Rule::function => self.function(pri)?,
+            Rule::expression => self.expression(pri)?,
             _ => {
                 return Err(anyhow!(
                     "internal parsing error, unexpected {}",
