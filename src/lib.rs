@@ -155,6 +155,12 @@ mod tests {
         assert_result(r#"min(d20, d20)"#, Value::Number(5.));
     }
 
+    #[test]
+    fn mod_works() {
+        assert_result(r#"10 % 3"#, Value::Number(1.));
+        assert_result(r#"10.5 % 1"#, Value::Number(0.5));
+    }
+
     fn assert_result(code: &str, value: Value) {
         init();
         let mut tmp = String::from(PRELUDE);

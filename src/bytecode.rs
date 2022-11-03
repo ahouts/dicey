@@ -36,6 +36,7 @@ pub enum OpCode {
     If,
     BeginElse,
     EndElse,
+    Mod,
 }
 
 impl OpCode {
@@ -69,6 +70,7 @@ impl OpCode {
             27 => Self::from(If),
             28 => Self::from(BeginElse),
             29 => Self::from(EndElse),
+            30 => Self::from(Mod),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -111,6 +113,7 @@ pub enum Instruction {
     If,
     BeginElse,
     EndElse,
+    Mod,
 }
 
 #[enum_dispatch]
@@ -421,17 +424,17 @@ impl InstructionImpl for Function {
 }
 
 dataless_opcode!(EndFunction, 24);
-
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub struct Chunk {
-    pub data: Vec<u8>,
-}
-
 dataless_opcode!(BeginIf, 25);
 dataless_opcode!(EndIf, 26);
 dataless_opcode!(If, 27);
 dataless_opcode!(BeginElse, 28);
 dataless_opcode!(EndElse, 29);
+dataless_opcode!(Mod, 30);
+
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
+pub struct Chunk {
+    pub data: Vec<u8>,
+}
 
 impl Chunk {
     pub fn push(&mut self, ins: impl Into<Instruction>) {

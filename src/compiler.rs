@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::bytecode::{
     Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
-    Equal, Function, Greater, GreaterEqual, If, Instruction, Less, LessEqual, LoadLocal, Multiply,
-    Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Subtract, RANDOM_BUILTIN_LITERAL_ID,
+    Equal, Function, Greater, GreaterEqual, If, Instruction, Less, LessEqual, LoadLocal, Mod,
+    Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Subtract,
+    RANDOM_BUILTIN_LITERAL_ID,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -269,6 +270,7 @@ impl Compiler {
             self.chunk.push(match op.as_str() {
                 "*" => Instruction::from(Multiply),
                 "/" => Instruction::from(Divide),
+                "%" => Instruction::from(Mod),
                 _ => {
                     return Err(anyhow!(
                         "internal parsing error, unexpected {}",

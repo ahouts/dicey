@@ -308,6 +308,11 @@ impl Vm {
                 }
             }
             crate::bytecode::Instruction::EndElse(_) => {}
+            crate::bytecode::Instruction::Mod(_) => {
+                let b = self.pop_number(chunk)?;
+                let a = self.pop_number(chunk)?;
+                self.stack.push(Value::Number(a % b));
+            }
         };
         Ok(())
     }

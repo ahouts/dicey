@@ -18,7 +18,7 @@ term = { factor ~ ( term_op ~ factor )* }
 term_op = { ( "-" | "+" ) }
 
 factor = { unary ~ ( factor_op ~ unary )* }
-factor_op = { ( "/" | "*" ) }
+factor_op = { ( "/" | "*" | "%" ) }
 
 unary = { unary_op* ~ call }
 unary_op = { ( "!" | "-" ) }
