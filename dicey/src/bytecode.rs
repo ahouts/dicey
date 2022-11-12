@@ -238,7 +238,7 @@ impl InstructionImpl for BooleanLit {
     }
 
     fn write(&self, chunk: &mut Chunk) {
-        chunk.data.push(if self.value { 1 } else { 0 });
+        chunk.data.push(u8::from(self.value));
     }
 }
 
