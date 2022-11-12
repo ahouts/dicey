@@ -13,4 +13,4 @@ anyhow = "1"
 dialoguer = "0.10"
 
 [dependencies.dicey]
-path = ".."
+path = "../dicey"
