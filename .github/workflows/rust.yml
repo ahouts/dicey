@@ -16,9 +16,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: rui314/setup-mold@v1
-    - name: Install build-essential
-      run: sudo apt install -y build-essential
     - name: Format
       run: cargo fmt --check
     - name: Clippy
