@@ -3,3 +3,6 @@ members = [
     "cli",
     "dicey",
 ]
+
+[profile.release]
+lto = true

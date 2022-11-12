@@ -14,3 +14,12 @@ dialoguer = "0.10"
 
 [dependencies.dicey]
 path = "../dicey"
+
+[dependencies.mimalloc]
+version = "0.1"
+default-features = false
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=mold",
+]

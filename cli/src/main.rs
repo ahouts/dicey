@@ -7,10 +7,13 @@
     clippy::expect_used
 )]
 
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use clap::Parser;
+use mimalloc::MiMalloc;
+use std::path::PathBuf;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
