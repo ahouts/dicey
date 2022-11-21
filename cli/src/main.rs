@@ -45,6 +45,8 @@ fn main() -> Result<()> {
 }
 
 fn run_command(code: &str) -> Result<dicey::Value> {
+    let prelude = dicey::PRELUDE;
+
     let input: String = dialoguer::Input::new()
         .allow_empty(false)
         .with_prompt("dicey")
@@ -54,7 +56,7 @@ fn run_command(code: &str) -> Result<dicey::Value> {
 
     let mut vm = dicey::Vm::default();
     let chunk = dicey::Compiler::default()
-        .compile(format!("{code}{input}").as_str())
+        .compile(format!("{prelude}{code}{input}").as_str())
         .context("error compiling script")?;
 
     vm.execute(&chunk).context("error executing script")
