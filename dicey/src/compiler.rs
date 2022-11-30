@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use crate::bytecode::{
     Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
     Equal, Function, Greater, GreaterEqual, If, Instruction, Less, LessEqual, LoadLocal, Mod,
-    Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Subtract,
-    RANDOM_BUILTIN_LITERAL_ID,
+    Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Roll, Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -28,14 +27,10 @@ pub struct Compiler {
 
 impl Default for Compiler {
     fn default() -> Self {
-        let mut global_scope = Scope::default();
-        global_scope
-            .locals
-            .insert(String::from("__random"), RANDOM_BUILTIN_LITERAL_ID);
         Self {
-            scopes: vec![global_scope],
-            next_local_id: 0,
             chunk: Chunk::default(),
+            scopes: vec![Scope::default()],
+            next_local_id: 0,
         }
     }
 }
@@ -324,9 +319,7 @@ impl Compiler {
 
     fn primary(&mut self, pri: Pair<Rule>) -> Result<()> {
         match pri.as_rule() {
-            Rule::number => self.chunk.push(NumberLit {
-                value: pri.as_str().parse().context("error parsing number")?,
-            }),
+            Rule::number_or_roll => self.number_or_roll(&pri)?,
             Rule::boolean => self.chunk.push(BooleanLit {
                 value: match pri.as_str() {
                     "true" => true,
@@ -343,6 +336,33 @@ impl Compiler {
                     pri.as_span().as_str()
                 ))
             }
+        }
+        Ok(())
+    }
+
+    fn number_or_roll(&mut self, number_or_lit: &Pair<Rule>) -> Result<()> {
+        let text = number_or_lit.as_str();
+        if let Some(idx) = text.find('d') {
+            let n = if idx == 0 {
+                1
+            } else {
+                text[..idx]
+                    .parse()
+                    .context("error parsing number of dice to roll")?
+            };
+            self.chunk.push(Roll {
+                n,
+                d: text[(idx + 1)..]
+                    .parse()
+                    .context("error parsing number of dice sides")?,
+            });
+        } else {
+            self.chunk.push(NumberLit {
+                value: number_or_lit
+                    .as_str()
+                    .parse()
+                    .context("error parsing number")?,
+            });
         }
         Ok(())
     }

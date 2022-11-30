@@ -3,8 +3,6 @@ use std::mem::size_of;
 use anyhow::{anyhow, Context, Result};
 use enum_dispatch::enum_dispatch;
 
-pub const RANDOM_BUILTIN_LITERAL_ID: u32 = u32::MAX;
-
 #[enum_dispatch(OpCodeImpl)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum OpCode {
@@ -37,6 +35,7 @@ pub enum OpCode {
     BeginElse,
     EndElse,
     Mod,
+    RollOp,
 }
 
 impl OpCode {
@@ -71,6 +70,7 @@ impl OpCode {
             28 => Self::from(BeginElse),
             29 => Self::from(EndElse),
             30 => Self::from(Mod),
+            31 => Self::from(RollOp),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -114,6 +114,7 @@ pub enum Instruction {
     BeginElse,
     EndElse,
     Mod,
+    Roll,
 }
 
 #[enum_dispatch]
@@ -430,6 +431,46 @@ dataless_opcode!(If, 27);
 dataless_opcode!(BeginElse, 28);
 dataless_opcode!(EndElse, 29);
 dataless_opcode!(Mod, 30);
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct RollOp;
+
+impl OpCodeImpl for RollOp {
+    fn byte(self) -> u8 {
+        31
+    }
+
+    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+        if buffer.len() < 2 {
+            Err(anyhow!("incomplete roll at end of bytecode"))
+        } else {
+            Ok((
+                Instruction::from(Roll {
+                    n: buffer[0],
+                    d: buffer[1],
+                }),
+                2,
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Roll {
+    pub n: u8,
+    pub d: u8,
+}
+
+impl InstructionImpl for Roll {
+    fn op_code(&self) -> OpCode {
+        OpCode::from(RollOp)
+    }
+
+    fn write(&self, chunk: &mut Chunk) {
+        chunk.data.push(self.n);
+        chunk.data.push(self.d);
+    }
+}
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Chunk {

@@ -1,4 +1,4 @@
-use crate::bytecode::{Call, Chunk, Instruction, InstructionImpl, OpCode};
+use crate::bytecode::{Call, Chunk, Instruction, InstructionImpl, OpCode, Roll};
 use anyhow::{anyhow, Context, Result};
 use fastrand::Rng;
 use num::ToPrimitive;
@@ -10,7 +10,6 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     Function { n_args: u8, loc: usize },
-    Random,
     IfCond { do_if: bool },
 }
 
@@ -81,7 +80,7 @@ impl fmt::Display for Value {
         match self {
             Self::Number(value) => write!(f, "{value}"),
             Self::Boolean(value) => write!(f, "{value}"),
-            Self::Function { .. } | Self::Random => write!(f, "<function>"),
+            Self::Function { .. } => write!(f, "<function>"),
             Self::IfCond { do_if } => write!(f, "IfCond {{ do_if: {do_if} }}"),
         }
     }
@@ -105,33 +104,13 @@ struct FuncScope {
     return_addr: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Vm {
     stack: Vec<Value>,
     globals: BTreeMap<u32, Local>,
     scopes: Vec<FuncScope>,
     pc: usize,
     pub(crate) rng: Rng,
-}
-
-impl Default for Vm {
-    fn default() -> Self {
-        let mut globals = BTreeMap::new();
-        globals.insert(
-            crate::bytecode::RANDOM_BUILTIN_LITERAL_ID,
-            Local {
-                value: Value::Random,
-                reachability: Reachability::Stack,
-            },
-        );
-        Self {
-            stack: Vec::new(),
-            globals,
-            scopes: Vec::new(),
-            pc: 0,
-            rng: Rng::default(),
-        }
-    }
 }
 
 impl Vm {
@@ -258,7 +237,7 @@ impl Vm {
                 self.stack.push(value);
             }
             crate::bytecode::Instruction::Call(call) => {
-                self.call(&call, chunk)?;
+                self.call(&call)?;
             }
             crate::bytecode::Instruction::Function(func) => {
                 self.stack.push(Value::Function {
@@ -313,27 +292,24 @@ impl Vm {
                 let a = self.pop_number(chunk)?;
                 self.stack.push(Value::Number(a % b));
             }
+            Instruction::Roll(Roll { n, d }) => {
+                let mut result = 0.;
+                for _ in 0..n {
+                    result += self
+                        .rng
+                        .u8(1..=d)
+                        .to_f64()
+                        .context("error converting u8 to f64")?;
+                }
+
+                self.stack.push(Value::Number(result));
+            }
         };
         Ok(())
     }
 
     #[allow(clippy::equatable_if_let)]
-    fn call(&mut self, call: &Call, chunk: &Chunk) -> Result<(), anyhow::Error> {
-        if let (1, Some(&Value::Random)) = (call.n_args, self.stack.iter().rev().nth(1)) {
-            let n = self
-                .pop_number(chunk)?
-                .to_u64()
-                .context("requested random number too big")?;
-            self.pop()
-                .context("error popping stack when getting random number")?;
-            self.stack.push(Value::Number(
-                (self.rng.u64(1..=n))
-                    .to_f64()
-                    .context("requested random number too big")?,
-            ));
-            return Ok(());
-        }
-
+    fn call(&mut self, call: &Call) -> Result<(), anyhow::Error> {
         let mut args = Vec::new();
         for _ in 0..call.n_args {
             args.push(self.pop().context("not enough arguments for call")?);
@@ -388,7 +364,7 @@ impl Vm {
     fn delegate_to_no_arg_func(&mut self, value: Value, chunk: &Chunk) -> Result<Value> {
         self.stack.push(value);
         let depth = self.scopes.len();
-        self.call(&Call { n_args: 0 }, chunk)?;
+        self.call(&Call { n_args: 0 })?;
         loop {
             if depth == self.scopes.len() {
                 return self.pop();

@@ -26,11 +26,12 @@ unary_op = { ( "!" | "-" ) }
 call = { ( primary ~ ( "(" ~ call_args ~ ")" )* ) }
 call_args = { ( expression ~ ("," ~ expression)* ~ ","? )? }
 
-primary = _{ ( number | boolean | function | identifier | "(" ~ expression ~ ")" ) }
-number = @{
+primary = _{ ( number_or_roll | boolean | function | identifier | "(" ~ expression ~ ")" ) }
+number_or_roll = @{
     (
-          ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
-        ~ ("." ~ ASCII_DIGIT*)?
+          "d" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
+        | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ ( ("d" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) | ("." ~ ASCII_DIGIT*)? )
+        | "0" ~ ("." ~ ASCII_DIGIT*)?
         | ("." ~ ASCII_DIGIT+)
     )
 }

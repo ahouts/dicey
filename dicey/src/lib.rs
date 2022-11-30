@@ -16,11 +16,6 @@ pub use compiler::Compiler;
 pub use vm::{Value, Vm};
 
 pub static PRELUDE: &str = r#"
-let nd = |n, d|
-    if n == 0 
-        then 0 
-        else __random(d) + nd(n - 1, d);
-
 let min = |a, b| {
     let av = a + 0;
     let bv = b + 0;
@@ -31,27 +26,6 @@ let max = |a, b| {
     let bv = b + 0;
     if av > bv then av else bv
 };
-
-let nd4 = |n| nd(n,4);
-let d4 = || nd4(1);
-
-let nd6 = |n| nd(n,6);
-let d6 = || nd6(1);
-
-let nd8 = |n| nd(n,8);
-let d8 = || nd8(1);
-
-let nd10 = |n| nd(n,10);
-let d10 = || nd10(1);
-
-let nd12 = |n| nd(n,12);
-let d12 = || nd12(1);
-
-let nd20 = |n| nd(n,20);
-let d20 = || nd20(1);
-
-let nd100 = |n| nd(n,100);
-let d100 = || nd100(1);
 "#;
 
 #[cfg(test)]
@@ -114,7 +88,7 @@ mod tests {
 
     #[test]
     fn calls_as_numbers() {
-        assert_result(r#"d12 + d6"#, Value::Number(12.));
+        assert_result(r#"(|| 1) + (|| 2)"#, Value::Number(3.));
     }
 
     #[test]
@@ -137,12 +111,12 @@ mod tests {
 
     #[test]
     fn nd() {
-        assert_result(r#"nd12(5,)"#, Value::Number(42.));
+        assert_result(r#"5d12"#, Value::Number(19.));
     }
 
     #[test]
     fn final_value_eval_no_arg_func() {
-        assert_result(r#"d20"#, Value::Number(5.));
+        assert_result(r#"|| d20"#, Value::Number(9.));
     }
 
     #[test]
@@ -152,7 +126,7 @@ mod tests {
 
     #[test]
     fn min_dice() {
-        assert_result(r#"min(d20, d20)"#, Value::Number(5.));
+        assert_result(r#"min(d20, d20)"#, Value::Number(6.));
     }
 
     #[test]
