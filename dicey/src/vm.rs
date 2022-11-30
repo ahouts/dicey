@@ -141,105 +141,101 @@ impl Vm {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn execute_ins(
-        &mut self,
-        ins: crate::bytecode::Instruction,
-        chunk: &Chunk,
-    ) -> Result<(), anyhow::Error> {
+    fn execute_ins(&mut self, ins: Instruction, chunk: &Chunk) -> Result<(), anyhow::Error> {
         log::trace!("{:10} {:?} {:?}", self.pc, self.stack, ins);
         match ins {
-            crate::bytecode::Instruction::NumberLit(lit) => {
+            Instruction::NumberLit(lit) => {
                 self.stack.push(Value::Number(lit.value));
             }
-            crate::bytecode::Instruction::Add(_) => {
+            Instruction::Add(_) => {
                 let b = self.pop_number(chunk)?;
                 let a = self.pop_number(chunk)?;
                 self.stack.push(Value::Number(a + b));
             }
-            crate::bytecode::Instruction::Subtract(_) => {
+            Instruction::Subtract(_) => {
                 let b = self.pop_number(chunk)?;
                 let a = self.pop_number(chunk)?;
                 self.stack.push(Value::Number(a - b));
             }
-            crate::bytecode::Instruction::Multiply(_) => {
+            Instruction::Multiply(_) => {
                 let b = self.pop_number(chunk)?;
                 let a = self.pop_number(chunk)?;
                 self.stack.push(Value::Number(a * b));
             }
-            crate::bytecode::Instruction::Divide(_) => {
+            Instruction::Divide(_) => {
                 let b = self.pop_number(chunk)?;
                 let a = self.pop_number(chunk)?;
                 self.stack.push(Value::Number(a / b));
             }
-            crate::bytecode::Instruction::Equal(_) => {
+            Instruction::Equal(_) => {
                 let b = self.pop_comparable(chunk)?;
                 let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a == b));
             }
-            crate::bytecode::Instruction::NotEqual(_) => {
+            Instruction::NotEqual(_) => {
                 let b = self.pop_comparable(chunk)?;
                 let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a != b));
             }
-            crate::bytecode::Instruction::GreaterEqual(_) => {
+            Instruction::GreaterEqual(_) => {
                 let b = self.pop_comparable(chunk)?;
                 let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a >= b));
             }
-            crate::bytecode::Instruction::Greater(_) => {
+            Instruction::Greater(_) => {
                 let b = self.pop_comparable(chunk)?;
                 let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a > b));
             }
-            crate::bytecode::Instruction::LessEqual(_) => {
+            Instruction::LessEqual(_) => {
                 let b = self.pop_comparable(chunk)?;
                 let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a <= b));
             }
-            crate::bytecode::Instruction::Less(_) => {
+            Instruction::Less(_) => {
                 let b = self.pop_comparable(chunk)?;
                 let a = self.pop_comparable(chunk)?;
                 self.stack.push(Value::Boolean(a < b));
             }
-            crate::bytecode::Instruction::Pop(_) => {
+            Instruction::Pop(_) => {
                 self.pop()?;
             }
-            crate::bytecode::Instruction::Or(_) => {
+            Instruction::Or(_) => {
                 let b = self.pop_bool(chunk)?;
                 let a = self.pop_bool(chunk)?;
                 self.stack.push(Value::Boolean(a || b));
             }
-            crate::bytecode::Instruction::And(_) => {
+            Instruction::And(_) => {
                 let b = self.pop_bool(chunk)?;
                 let a = self.pop_bool(chunk)?;
                 self.stack.push(Value::Boolean(a && b));
             }
-            crate::bytecode::Instruction::Negate(_) => {
+            Instruction::Negate(_) => {
                 let a = self.pop_number(chunk)?;
                 self.stack.push(Value::Number(-a));
             }
-            crate::bytecode::Instruction::Not(_) => {
+            Instruction::Not(_) => {
                 let a = self.pop_bool(chunk)?;
                 self.stack.push(Value::Boolean(!a));
             }
-            crate::bytecode::Instruction::BooleanLit(lit) => {
+            Instruction::BooleanLit(lit) => {
                 self.stack.push(Value::Boolean(lit.value));
             }
-            crate::bytecode::Instruction::PushLocal(local) => {
+            Instruction::PushLocal(local) => {
                 let value = self.pop()?;
                 self.push_local(local.id, value);
             }
-            crate::bytecode::Instruction::PopLocal(local) => {
+            Instruction::PopLocal(local) => {
                 self.unstack_local(local.id)?;
             }
-            crate::bytecode::Instruction::LoadLocal(local) => {
+            Instruction::LoadLocal(local) => {
                 let value = self.get_local(local.id)?;
                 self.stack.push(value);
             }
-            crate::bytecode::Instruction::Call(call) => {
+            Instruction::Call(call) => {
                 self.call(&call)?;
             }
-            crate::bytecode::Instruction::Function(func) => {
+            Instruction::Function(func) => {
                 self.stack.push(Value::Function {
                     n_args: func.n_args,
                     loc: self.pc,
@@ -258,36 +254,36 @@ impl Vm {
                     }
                 }
             }
-            crate::bytecode::Instruction::EndFunction(_) => {
+            Instruction::EndFunction(_) => {
                 self.pc = self
                     .scopes
                     .pop()
                     .context("returned when not in function call")?
                     .return_addr;
             }
-            crate::bytecode::Instruction::If(_) => {
+            Instruction::If(_) => {
                 if self.pop_bool(chunk)? {
                     self.stack.push(Value::IfCond { do_if: true });
                 } else {
                     self.stack.push(Value::IfCond { do_if: false });
                 }
             }
-            crate::bytecode::Instruction::BeginIf(_) => {
+            Instruction::BeginIf(_) => {
                 if !self.pop()?.to_if_cond()? {
                     self.skip_cond(chunk)?;
                     self.stack.push(Value::IfCond { do_if: false });
                 }
             }
-            crate::bytecode::Instruction::EndIf(_) => {
+            Instruction::EndIf(_) => {
                 self.stack.push(Value::IfCond { do_if: true });
             }
-            crate::bytecode::Instruction::BeginElse(_) => {
+            Instruction::BeginElse(_) => {
                 if self.pop()?.to_if_cond()? {
                     self.skip_cond(chunk)?;
                 }
             }
-            crate::bytecode::Instruction::EndElse(_) => {}
-            crate::bytecode::Instruction::Mod(_) => {
+            Instruction::EndElse(_) => {}
+            Instruction::Mod(_) => {
                 let b = self.pop_number(chunk)?;
                 let a = self.pop_number(chunk)?;
                 self.stack.push(Value::Number(a % b));
