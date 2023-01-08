@@ -124,13 +124,17 @@ impl Vm {
             self.pc += off;
             self.execute_ins(ins, chunk)?;
         }
-        let result = self.pop()?;
 
-        let result = match result {
-            result @ Value::Function { n_args: 0, .. } => {
-                self.delegate_to_no_arg_func(result, chunk)?
-            }
-            result => result,
+        let result = loop {
+            let result = self.pop()?;
+
+            match result {
+                result @ Value::Function { n_args: 0, .. } => {
+                    let res = self.delegate_to_no_arg_func(result, chunk)?;
+                    self.stack.push(res);
+                }
+                result => break result,
+            };
         };
 
         if self.stack.is_empty() {

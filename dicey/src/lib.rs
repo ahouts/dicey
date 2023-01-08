@@ -135,6 +135,11 @@ mod tests {
         assert_result(r#"10.5 % 1"#, Value::Number(0.5));
     }
 
+    #[test]
+    fn chained_final_function_value() {
+        assert_result(r#"let a = || 3; let b = || a; b"#, Value::Number(3.));
+    }
+
     fn assert_result(code: &str, value: Value) {
         init();
         let mut tmp = String::from(PRELUDE);
