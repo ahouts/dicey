@@ -111,6 +111,7 @@ pub struct Vm {
     scopes: Vec<FuncScope>,
     pc: usize,
     pub(crate) rng: Rng,
+    recurse_depth: u8,
 }
 
 impl Vm {
@@ -130,6 +131,7 @@ impl Vm {
 
             match result {
                 result @ Value::Function { n_args: 0, .. } => {
+                    self.recurse_depth = self.recurse_depth.saturating_add(1);
                     let res = self.delegate_to_no_arg_func(result, chunk)?;
                     self.stack.push(res);
                 }
@@ -362,17 +364,22 @@ impl Vm {
     }
 
     fn delegate_to_no_arg_func(&mut self, value: Value, chunk: &Chunk) -> Result<Value> {
+        self.recurse_depth = self.recurse_depth.saturating_add(1);
         self.stack.push(value);
         let depth = self.scopes.len();
         self.call(&Call { n_args: 0 })?;
         loop {
             if depth == self.scopes.len() {
+                self.recurse_depth = self.recurse_depth.saturating_sub(1);
                 return self.pop();
             }
             if self.pc >= chunk.data.len() {
                 return Err(anyhow!(
                     "unexpected end of program while executing function"
                 ));
+            }
+            if self.recurse_depth == u8::MAX {
+                return Err(anyhow!("stack overflow"));
             }
             let (ins, off) = chunk.read(self.pc)?;
             self.pc += off;
