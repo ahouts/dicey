@@ -421,6 +421,17 @@ impl Compiler {
     }
 
     fn add_local(&mut self, name: &str) -> Result<u32> {
+        {
+            let mut iter = name.chars().fuse();
+            let first = iter.next();
+
+            if let Some(f) = first {
+                if f == 'd' && iter.all(|c| ('0'..='9').contains(&c)) && name.len() > 1 {
+                    return Err(anyhow!("identifier {} is ambiguous with a dice roll", name,));
+                }
+            }
+        }
+
         let next_id = self.next_local_id();
         if let Some(scope) = self.scopes.last_mut() {
             scope.locals.insert(name.to_string(), next_id);

@@ -150,6 +150,24 @@ mod tests {
         assert_err(r#"let a = || a + a; a"#, "stack overflow");
     }
 
+    #[test]
+    fn ambiguous_identifier() {
+        assert_err(
+            r#"let d10 = 1; d10"#,
+            "identifier d10 is ambiguous with a dice roll",
+        );
+    }
+
+    #[test]
+    fn ambiguous_parameter() {
+        assert_err(r#"|d5| 5"#, "identifier d5 is ambiguous with a dice roll");
+    }
+
+    #[test]
+    fn d_acceptable_local() {
+        assert_value(r#"let d = 5; d"#, Value::Number(5.));
+    }
+
     fn assert_value(code: &str, value: Value) {
         assert_eq!(get_result(code).unwrap(), value);
     }
@@ -162,7 +180,7 @@ mod tests {
         init();
         let mut tmp = String::from(PRELUDE);
         tmp.push_str(code);
-        let chunk = compiler::Compiler::default().compile(tmp.as_str()).unwrap();
+        let chunk = compiler::Compiler::default().compile(tmp.as_str())?;
         let mut vm = Vm::default();
         vm.rng.seed(12345);
         vm.execute(&chunk)
