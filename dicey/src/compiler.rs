@@ -424,9 +424,10 @@ impl Compiler {
         {
             let mut iter = name.chars().fuse();
             let first = iter.next();
+            let second = iter.next();
 
-            if let Some(f) = first {
-                if f == 'd' && iter.all(|c| ('0'..='9').contains(&c)) && name.len() > 1 {
+            if let (Some(f), Some(s)) = (first, second) {
+                if f == 'd' && ('0'..='9').contains(&s) {
                     return Err(anyhow!("identifier {} is ambiguous with a dice roll", name,));
                 }
             }
