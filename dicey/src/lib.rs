@@ -190,6 +190,13 @@ mod tests {
         assert_err(r#"[][0]"#, "index 0 out of bounds");
     }
 
+    #[test]
+    fn bad_index() {
+        assert_err(r#"false[0]"#, "tried to peek list, found false");
+        assert_err(r#"1[0]"#, "tried to peek list, found 1");
+        assert_err(r#"(|| false)[0]"#, "tried to peek list, found <function>");
+    }
+
     fn assert_value(code: &str, value: &Value) {
         assert_eq!(&get_result(code).unwrap(), value);
     }
