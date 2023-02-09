@@ -207,6 +207,26 @@ mod tests {
         assert_value(r#"let x = $ d100; x == x"#, &Value::Boolean(true));
     }
 
+    #[test]
+    fn tower_of_doom() {
+        assert_value(
+            r#"let x = || || || || || || || || || || || || || || 5; x + 1"#,
+            &Value::Number(6.),
+        );
+        assert_value(
+            r#"let x = || || || || || || || || || || || || || || false; if x then 1 else 0"#,
+            &Value::Number(0.),
+        );
+        assert_value(
+            r#"let x = || || || || || || || || || || || || || || [true]; x[0]"#,
+            &Value::Boolean(true),
+        );
+        assert_value(
+            r#"let x = || || || || || || || || || || || || || || 5; x < 3"#,
+            &Value::Boolean(false),
+        );
+    }
+
     fn assert_value(code: &str, value: &Value) {
         assert_eq!(&get_result(code).unwrap(), value);
     }
