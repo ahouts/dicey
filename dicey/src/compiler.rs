@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use crate::bytecode::{
     Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
     Equal, Function, Greater, GreaterEqual, If, Index, Instruction, Less, LessEqual, LoadLocal,
-    Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, Push, PushList, PushLocal, Roll,
-    Subtract,
+    Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or, Push, PushList, PushLocal, Roll, Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -105,7 +104,29 @@ impl Compiler {
 
         let local_id = self.add_local(ident.as_str())?;
 
-        self.expression(expr)?;
+        match expr.as_rule() {
+            Rule::lazy_expression => {
+                self.function_raw(
+                    std::iter::empty(),
+                    expr.into_inner()
+                        .next()
+                        .context("error unwrapping lazy expression")?,
+                )?;
+            }
+            Rule::expression => {
+                self.expression(expr)?;
+            }
+            Rule::function => {
+                self.function(expr)?;
+            }
+            unexpected => {
+                return Err(anyhow!(
+                    "unexpected {:?} at {}",
+                    unexpected,
+                    expr.as_span().as_str(),
+                ))
+            }
+        }
 
         self.chunk.push(PushLocal { id: local_id });
 
@@ -124,7 +145,7 @@ impl Compiler {
             unexpected => Err(anyhow!(
                 "unexpected {:?} at {}",
                 unexpected,
-                inner.as_span().as_str()
+                inner.as_span().as_str(),
             )),
         }
     }
@@ -406,9 +427,16 @@ impl Compiler {
         let expr = inner
             .next()
             .context("internal parsing error, expected function body")?;
+        self.function_raw(parameters.into_inner().rev(), expr)
+    }
 
+    fn function_raw<'a>(
+        &mut self,
+        parameters: impl Iterator<Item = Pair<'a, Rule>>,
+        expr: Pair<'a, Rule>,
+    ) -> Result<()> {
         let mut args = Vec::new();
-        for arg in parameters.into_inner().rev() {
+        for arg in parameters {
             let local_id = self.add_local(arg.as_str())?;
             args.push(PushLocal { id: local_id });
         }
@@ -435,10 +463,7 @@ impl Compiler {
     }
 
     fn end_scope(&mut self) -> Result<()> {
-        if let Some(scope) = self.scopes.pop() {
-            for (_, id) in scope.locals {
-                self.chunk.push(PopLocal { id });
-            }
+        if self.scopes.pop().is_some() {
             Ok(())
         } else {
             Err(anyhow!("internal parsing error, ended root scope"))

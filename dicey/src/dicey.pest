@@ -1,6 +1,7 @@
 WHITESPACE = _{ WHITE_SPACE }
 
-declaration = { "let" ~ identifier ~ "=" ~ expression ~ ";" }
+declaration = { "let" ~ identifier ~ "=" ~ (function | ( "$" ~ expression ) | lazy_expression) ~ ";" }
+lazy_expression = { expression }
 expression = { ( if_statement | block | logic_or ) }
 block = { "{" ~ declaration* ~ expression ~ "}" }
 if_statement = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }

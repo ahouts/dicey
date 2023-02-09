@@ -23,13 +23,6 @@ impl Value {
         }
     }
 
-    fn to_bool(&self) -> Result<bool> {
-        match self {
-            Self::Boolean(value) => Ok(*value),
-            unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
-        }
-    }
-
     fn to_func(&self) -> Result<(u8, usize)> {
         match self {
             Self::Function { n_args, loc } => Ok((*n_args, *loc)),
@@ -114,16 +107,9 @@ impl fmt::Debug for Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
-enum Reachability {
-    Stack,
-    Unknown,
-}
-
 #[derive(Debug, Clone)]
 struct Local {
     value: Value,
-    reachability: Reachability,
 }
 
 #[derive(Debug, Clone)]
@@ -259,9 +245,6 @@ impl Vm {
                 let value = self.pop()?;
                 self.push_local(local.id, value);
             }
-            Instruction::PopLocal(local) => {
-                self.unstack_local(local.id)?;
-            }
             Instruction::LoadLocal(local) => {
                 let value = self.get_local(local.id)?;
                 self.stack.push(value);
@@ -340,14 +323,14 @@ impl Vm {
             }
             Instruction::Push(_) => {
                 let value = self.pop()?;
-                let mut ls = self.peek_list()?;
+                let mut ls = self.peek_list(chunk)?;
                 ls.push(value);
             }
             Instruction::Index(_) => {
                 let idx_raw = self.pop()?;
                 let idx: usize =
                     num::cast(self.as_number(chunk, idx_raw)?).context("invalid index")?;
-                let ls = self.peek_list()?;
+                let ls = self.peek_list(chunk)?;
                 if let Some(value) = ls.get(idx) {
                     let new = value.clone();
                     drop(ls);
@@ -385,32 +368,40 @@ impl Vm {
         Ok(())
     }
 
-    fn as_number(&mut self, chunk: &Chunk, value: Value) -> Result<f64> {
-        match value {
-            Value::Number(n) => Ok(n),
-            Value::Function { n_args: 0, .. } => {
-                self.delegate_to_no_arg_func(value, chunk)?.to_number()
+    fn as_number(&mut self, chunk: &Chunk, mut value: Value) -> Result<f64> {
+        loop {
+            match value {
+                Value::Number(n) => return Ok(n),
+                Value::Function { n_args: 0, .. } => {
+                    value = self.delegate_to_no_arg_func(value, chunk)?;
+                }
+                unexpected => return Err(anyhow!("expected number, found {unexpected}")),
             }
-            unexpected => Err(anyhow!("expected number, found {unexpected}")),
         }
     }
 
-    fn as_bool(&mut self, chunk: &Chunk, value: Value) -> Result<bool> {
-        match value {
-            Value::Boolean(v) => Ok(v),
-            Value::Function { n_args: 0, .. } => {
-                self.delegate_to_no_arg_func(value, chunk)?.to_bool()
+    fn as_bool(&mut self, chunk: &Chunk, mut value: Value) -> Result<bool> {
+        loop {
+            match value {
+                Value::Boolean(v) => return Ok(v),
+                Value::Function { n_args: 0, .. } => {
+                    value = self.delegate_to_no_arg_func(value, chunk)?;
+                }
+                unexpected => return Err(anyhow!("expected boolean, found {unexpected}")),
             }
-            unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
         }
     }
 
-    fn as_comparable(&mut self, chunk: &Chunk, value: Value) -> Result<Value> {
-        match value {
-            Value::Number(n) => Ok(Value::Number(n)),
-            Value::Boolean(v) => Ok(Value::Boolean(v)),
-            Value::Function { n_args: 0, .. } => self.delegate_to_no_arg_func(value, chunk),
-            unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
+    fn as_comparable(&mut self, chunk: &Chunk, mut value: Value) -> Result<Value> {
+        loop {
+            match value {
+                Value::Number(n) => return Ok(Value::Number(n)),
+                Value::Boolean(v) => return Ok(Value::Boolean(v)),
+                Value::Function { n_args: 0, .. } => {
+                    value = self.delegate_to_no_arg_func(value, chunk)?;
+                }
+                unexpected => return Err(anyhow!("expected boolean, found {unexpected}")),
+            }
         }
     }
 
@@ -457,7 +448,19 @@ impl Vm {
         self.stack.pop().context("tried to pop empty stack")
     }
 
-    fn peek_list(&self) -> Result<MutexGuard<Vec<Value>>> {
+    fn peek_list(&mut self, chunk: &Chunk) -> Result<MutexGuard<Vec<Value>>> {
+        loop {
+            match self.stack.last() {
+                Some(Value::Function { n_args: 0, .. }) => {
+                    let func = self.stack.pop().context("somehow empty stack")?;
+                    let value = self.delegate_to_no_arg_func(func, chunk)?;
+                    self.stack.push(value);
+                }
+                Some(Value::List(_)) => break,
+                Some(value) => return Err(anyhow!("tried to peek list, found {value}")),
+                None => return Err(anyhow!("tried to peek list with nothing on stack")),
+            };
+        }
         match self.stack.last() {
             Some(Value::List(reference)) => match reference.lock() {
                 Ok(ls) => Ok(ls),
@@ -502,21 +505,9 @@ impl Vm {
 
     fn push_local(&mut self, id: u32, value: Value) {
         if let Some(local_scope) = self.scopes.last_mut() {
-            local_scope.locals.insert(
-                id,
-                Local {
-                    value,
-                    reachability: Reachability::Stack,
-                },
-            );
+            local_scope.locals.insert(id, Local { value });
         } else {
-            self.globals.insert(
-                id,
-                Local {
-                    value,
-                    reachability: Reachability::Stack,
-                },
-            );
+            self.globals.insert(id, Local { value });
         }
     }
 
@@ -532,19 +523,5 @@ impl Vm {
             .context("could not find local")?
             .value
             .clone())
-    }
-
-    fn unstack_local(&mut self, id: u32) -> Result<()> {
-        for local_scope in self.scopes.iter_mut().rev() {
-            if let Some(local) = local_scope.locals.get_mut(&id) {
-                local.reachability = Reachability::Unknown;
-                return Ok(());
-            }
-        }
-        self.globals
-            .get_mut(&id)
-            .context("could not find local")?
-            .reachability = Reachability::Unknown;
-        Ok(())
     }
 }

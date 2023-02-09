@@ -17,13 +17,13 @@ pub use vm::{Value, Vm};
 
 pub static PRELUDE: &str = r#"
 let min = |a, b| {
-    let av = a + 0;
-    let bv = b + 0;
+    let av = $ a + 0;
+    let bv = $ b + 0;
     if av < bv then av else bv
 };
 let max = |a, b| {
-    let av = a + 0;
-    let bv = b + 0;
+    let av = $ a + 0;
+    let bv = $ b + 0;
     if av > bv then av else bv
 };
 "#;
@@ -194,7 +194,17 @@ mod tests {
     fn bad_index() {
         assert_err(r#"false[0]"#, "tried to peek list, found false");
         assert_err(r#"1[0]"#, "tried to peek list, found 1");
-        assert_err(r#"(|| false)[0]"#, "tried to peek list, found <function>");
+        assert_err(r#"(|| false)[0]"#, "tried to peek list, found false");
+    }
+
+    #[test]
+    fn assignment_lazy() {
+        assert_value(r#"let x = d100; x == x"#, &Value::Boolean(false));
+    }
+
+    #[test]
+    fn strict_assignment_not_lazy() {
+        assert_value(r#"let x = $ d100; x == x"#, &Value::Boolean(true));
     }
 
     fn assert_value(code: &str, value: &Value) {

@@ -24,7 +24,6 @@ pub enum OpCode {
     Not,
     BooleanLitOp,
     PushLocalOp,
-    PopLocalOp,
     LoadLocalOp,
     CallOp,
     FunctionOp,
@@ -62,7 +61,6 @@ impl OpCode {
             16 => Self::from(Not),
             17 => Self::from(BooleanLitOp),
             18 => Self::from(PushLocalOp),
-            19 => Self::from(PopLocalOp),
             20 => Self::from(LoadLocalOp),
             22 => Self::from(CallOp),
             23 => Self::from(FunctionOp),
@@ -109,7 +107,6 @@ pub enum Instruction {
     Not,
     BooleanLit,
     PushLocal,
-    PopLocal,
     LoadLocal,
     Call,
     Function,
@@ -282,45 +279,6 @@ pub struct PushLocal {
 impl InstructionImpl for PushLocal {
     fn op_code(&self) -> OpCode {
         OpCode::from(PushLocalOp)
-    }
-
-    fn write(&self, chunk: &mut Chunk) {
-        for byte in u32::to_be_bytes(self.id) {
-            chunk.data.push(byte);
-        }
-    }
-}
-
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct PopLocalOp;
-
-impl OpCodeImpl for PopLocalOp {
-    fn byte(self) -> u8 {
-        19
-    }
-
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
-        if buffer.len() < 4 {
-            Err(anyhow!("incomplete load local at end of bytecode"))
-        } else {
-            Ok((
-                Instruction::from(PopLocal {
-                    id: u32::from_be_bytes(buffer[..4].try_into().context("internal VM error")?),
-                }),
-                4,
-            ))
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PopLocal {
-    pub id: u32,
-}
-
-impl InstructionImpl for PopLocal {
-    fn op_code(&self) -> OpCode {
-        OpCode::from(PopLocalOp)
     }
 
     fn write(&self, chunk: &mut Chunk) {
