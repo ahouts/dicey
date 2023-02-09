@@ -38,7 +38,7 @@ fn main() -> Result<()> {
                 eprintln!("{value}");
             }
             Err(err) => {
-                eprintln!("{:?}", err);
+                eprintln!("{err:?}");
             }
         }
     }

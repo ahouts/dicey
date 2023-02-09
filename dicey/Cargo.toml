@@ -12,6 +12,7 @@ anyhow = "1"
 fastrand = "1"
 log = "0.4"
 num = "0.4"
+num-traits = "0.2"
 
 [dev-dependencies]
 simple_logger = "4"

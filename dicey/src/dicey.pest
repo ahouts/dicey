@@ -20,13 +20,14 @@ term_op = { ( "-" | "+" ) }
 factor = { unary ~ ( factor_op ~ unary )* }
 factor_op = { ( "/" | "*" | "%" ) }
 
-unary = { unary_op* ~ call }
+unary = { unary_op* ~ qualify }
 unary_op = { ( "!" | "-" ) }
 
-call = { ( primary ~ ( "(" ~ call_args ~ ")" )* ) }
+qualify = { ( primary ~ ( "(" ~ call_args ~ ")" | "[" ~ index ~ "]" )* ) }
 call_args = { ( expression ~ ("," ~ expression)* ~ ","? )? }
+index = { expression }
 
-primary = _{ ( number_or_roll | boolean | function | identifier | "(" ~ expression ~ ")" ) }
+primary = _{ ( number_or_roll | boolean | list | function | identifier | "(" ~ expression ~ ")" ) }
 number_or_roll = @{
     (
           "d" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
@@ -39,5 +40,7 @@ boolean = @{ "true" | "false" }
 identifier = @{ ( XID_START | "_" ) ~ XID_CONTINUE* }
 function = { parameters ~ expression }
 parameters = { "|" ~ ( identifier ~ ("," ~ identifier)* ~ ","? )? ~ "|" }
+list = { "[" ~ list_items ~ "]" }
+list_items = _{ ( expression ~ ("," ~ expression)* ~ ","? )?  }
 
 file = { SOI ~ declaration* ~ expression ~ EOI }

@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::bytecode::{
     Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
-    Equal, Function, Greater, GreaterEqual, If, Instruction, Less, LessEqual, LoadLocal, Mod,
-    Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, PushLocal, Roll, Subtract,
+    Equal, Function, Greater, GreaterEqual, If, Index, Instruction, Less, LessEqual, LoadLocal,
+    Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or, PopLocal, Push, PushList, PushLocal, Roll,
+    Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -291,7 +292,7 @@ impl Compiler {
                         ))
                     }
                 },
-                _ => self.call(item)?,
+                _ => self.qualify(item)?,
             }
         }
         for op in ops.into_iter().rev() {
@@ -300,19 +301,33 @@ impl Compiler {
         Ok(())
     }
 
-    fn call(&mut self, c: Pair<Rule>) -> Result<()> {
+    fn qualify(&mut self, c: Pair<Rule>) -> Result<()> {
         let mut inner = c.into_inner();
         let pri = inner
             .next()
             .context("internal parsing error, expected primary")?;
         self.primary(pri)?;
-        for call_args in inner {
-            let mut n_args = 0;
-            for arg in call_args.into_inner() {
-                self.expression(arg)?;
-                n_args += 1;
+        for qualifier in inner {
+            match qualifier.as_rule() {
+                Rule::call_args => {
+                    let mut n_args = 0;
+                    for arg in qualifier.into_inner() {
+                        self.expression(arg)?;
+                        n_args += 1;
+                    }
+                    self.chunk.push(Call { n_args });
+                }
+                Rule::index => {
+                    self.expression(
+                        qualifier
+                            .into_inner()
+                            .next()
+                            .context("no value for index")?,
+                    )?;
+                    self.chunk.push(Index);
+                }
+                _ => return Err(anyhow!("unexpected qualifier: {qualifier}")),
             }
-            self.chunk.push(Call { n_args });
         }
         Ok(())
     }
@@ -328,6 +343,7 @@ impl Compiler {
                 },
             }),
             Rule::identifier => self.identifier(&pri)?,
+            Rule::list => self.list(pri)?,
             Rule::function => self.function(pri)?,
             Rule::expression => self.expression(pri)?,
             _ => {
@@ -370,6 +386,15 @@ impl Compiler {
     fn identifier(&mut self, id: &Pair<Rule>) -> Result<()> {
         let local_id = self.resolve_local(id.as_str())?;
         self.chunk.push(LoadLocal { id: local_id });
+        Ok(())
+    }
+
+    fn list(&mut self, ls: Pair<Rule>) -> Result<()> {
+        self.chunk.push(PushList);
+        for elem in ls.into_inner() {
+            self.expression(elem)?;
+            self.chunk.push(Push);
+        }
         Ok(())
     }
 

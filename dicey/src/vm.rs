@@ -4,40 +4,42 @@ use fastrand::Rng;
 use num::ToPrimitive;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::{Arc, Mutex, MutexGuard};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Clone)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
     Function { n_args: u8, loc: usize },
     IfCond { do_if: bool },
+    List(Arc<Mutex<Vec<Value>>>),
 }
 
 impl Value {
-    pub fn to_number(self) -> Result<f64> {
+    pub fn to_number(&self) -> Result<f64> {
         match self {
-            Self::Number(n) => Ok(n),
+            Self::Number(n) => Ok(*n),
             unexpected => Err(anyhow!("expected number, found {unexpected}")),
         }
     }
 
-    fn to_bool(self) -> Result<bool> {
+    fn to_bool(&self) -> Result<bool> {
         match self {
-            Self::Boolean(value) => Ok(value),
+            Self::Boolean(value) => Ok(*value),
             unexpected => Err(anyhow!("expected boolean, found {unexpected}")),
         }
     }
 
-    fn to_func(self) -> Result<(u8, usize)> {
+    fn to_func(&self) -> Result<(u8, usize)> {
         match self {
-            Self::Function { n_args, loc } => Ok((n_args, loc)),
+            Self::Function { n_args, loc } => Ok((*n_args, *loc)),
             unexpected => Err(anyhow!("expected function, found {unexpected}")),
         }
     }
 
-    fn to_if_cond(self) -> Result<bool> {
+    fn to_if_cond(&self) -> Result<bool> {
         match self {
-            Self::IfCond { do_if } => Ok(do_if),
+            Self::IfCond { do_if } => Ok(*do_if),
             unexpected => Err(anyhow!("expected if cond, found {unexpected}")),
         }
     }
@@ -56,10 +58,15 @@ impl From<bool> for Value {
 }
 
 impl PartialEq for Value {
+    #[allow(clippy::significant_drop_in_scrutinee)]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Number(n1), Self::Number(n2)) => n1 == n2,
             (Self::Boolean(b1), Self::Boolean(b2)) => b1 == b2,
+            (Self::List(l1), Self::List(l2)) => match (l1.lock(), l2.lock()) {
+                (Ok(g1), Ok(g2)) => g1.as_slice() == g2.as_slice(),
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -82,7 +89,28 @@ impl fmt::Display for Value {
             Self::Boolean(value) => write!(f, "{value}"),
             Self::Function { .. } => write!(f, "<function>"),
             Self::IfCond { do_if } => write!(f, "IfCond {{ do_if: {do_if} }}"),
+            Self::List(reference) => {
+                write!(f, "[ ")?;
+                match reference.lock() {
+                    Ok(ls) => {
+                        for value in &*ls {
+                            write!(f, "{value}, ")?;
+                        }
+                    }
+                    Err(_) => {
+                        write!(f, "POISON!")?;
+                    }
+                }
+                write!(f, "]")?;
+                Ok(())
+            }
         }
+    }
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
     }
 }
 
@@ -306,6 +334,29 @@ impl Vm {
 
                 self.stack.push(Value::Number(result));
             }
+            Instruction::PushList(_) => {
+                self.stack
+                    .push(Value::List(Arc::new(Mutex::new(Vec::new()))));
+            }
+            Instruction::Push(_) => {
+                let value = self.pop()?;
+                let mut ls = self.peek_list()?;
+                ls.push(value);
+            }
+            Instruction::Index(_) => {
+                let idx_raw = self.pop()?;
+                let idx: usize =
+                    num::cast(self.as_number(chunk, idx_raw)?).context("invalid index")?;
+                let ls = self.peek_list()?;
+                if let Some(value) = ls.get(idx) {
+                    let new = value.clone();
+                    drop(ls);
+                    self.pop()?;
+                    self.stack.push(new);
+                } else {
+                    return Err(anyhow!("index {idx} out of bounds"));
+                }
+            }
         };
         Ok(())
     }
@@ -406,6 +457,17 @@ impl Vm {
         self.stack.pop().context("tried to pop empty stack")
     }
 
+    fn peek_list(&self) -> Result<MutexGuard<Vec<Value>>> {
+        match self.stack.last() {
+            Some(Value::List(reference)) => match reference.lock() {
+                Ok(ls) => Ok(ls),
+                Err(err) => Err(anyhow!("reference to list poisoned: {err}")),
+            },
+            Some(value) => Err(anyhow!("tried to peek list, found {value}")),
+            None => Err(anyhow!("tried to peek list with nothing on stack")),
+        }
+    }
+
     fn skip_cond(&mut self, chunk: &Chunk) -> Result<()> {
         let mut depth = 0;
         loop {
@@ -461,10 +523,15 @@ impl Vm {
     fn get_local(&self, id: u32) -> Result<Value> {
         for local_scope in self.scopes.iter().rev() {
             if let Some(local) = local_scope.locals.get(&id) {
-                return Ok(local.value);
+                return Ok(local.value.clone());
             }
         }
-        Ok(self.globals.get(&id).context("could not find local")?.value)
+        Ok(self
+            .globals
+            .get(&id)
+            .context("could not find local")?
+            .value
+            .clone())
     }
 
     fn unstack_local(&mut self, id: u32) -> Result<()> {
