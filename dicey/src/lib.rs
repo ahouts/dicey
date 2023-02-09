@@ -16,15 +16,15 @@ pub use compiler::Compiler;
 pub use vm::{Value, Vm};
 
 pub static PRELUDE: &str = r#"
-let min = |a, b| {
-    let av = $ a + 0;
-    let bv = $ b + 0;
-    if av < bv then av else bv
+let adv = |v| {
+    let v1 = $ v;
+    let v2 = $ v;
+    if v1 > v2 then v1 else v2
 };
-let max = |a, b| {
-    let av = $ a + 0;
-    let bv = $ b + 0;
-    if av > bv then av else bv
+let dis = |v| {
+    let v1 = $ v;
+    let v2 = $ v;
+    if v1 < v2 then v1 else v2
 };
 "#;
 
@@ -122,13 +122,13 @@ mod tests {
     }
 
     #[test]
-    fn min_max() {
-        assert_value(r#"min(max(17, 13), 23)"#, &Value::Number(17.));
+    fn dis() {
+        assert_value(r#"dis(d20)"#, &Value::Number(6.));
     }
 
     #[test]
-    fn min_dice() {
-        assert_value(r#"min(d20, d20)"#, &Value::Number(6.));
+    fn adv() {
+        assert_value(r#"adv(d20)"#, &Value::Number(9.));
     }
 
     #[test]
@@ -144,12 +144,12 @@ mod tests {
 
     #[test]
     fn infinite_recursion() {
-        assert_err(r#"let a = || a; a"#, "stack overflow");
+        assert_err(r#"let a = a; a"#, "stack overflow");
     }
 
     #[test]
     fn infinite_recursion2() {
-        assert_err(r#"let a = || a + a; a"#, "stack overflow");
+        assert_err(r#"let a = a + a; a"#, "stack overflow");
     }
 
     #[test]
@@ -223,6 +223,14 @@ mod tests {
         );
         assert_value(
             r#"let x = || || || || || || || || || || || || || || 5; x < 3"#,
+            &Value::Boolean(false),
+        );
+        assert_value(
+            r#"let x = || || || || || || || || || || || || || || d100; let y = $ x; y == y"#,
+            &Value::Boolean(true),
+        );
+        assert_value(
+            r#"let x = || || || || || || || || || || || || || || d100; let y = x; y == y"#,
             &Value::Boolean(false),
         );
     }

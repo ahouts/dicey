@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use crate::bytecode::{
     Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
     Equal, Function, Greater, GreaterEqual, If, Index, Instruction, Less, LessEqual, LoadLocal,
-    Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or, Push, PushList, PushLocal, Roll, Subtract,
+    Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or, Push, PushList, PushLocal, Roll, Strict,
+    Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -115,6 +116,7 @@ impl Compiler {
             }
             Rule::expression => {
                 self.expression(expr)?;
+                self.chunk.push(Strict);
             }
             Rule::function => {
                 self.function(expr)?;
@@ -387,12 +389,17 @@ impl Compiler {
                     .parse()
                     .context("error parsing number of dice to roll")?
             };
+
+            self.chunk.push(Function { n_args: 0 });
+            self.begin_scope();
             self.chunk.push(Roll {
                 n,
                 d: text[(idx + 1)..]
                     .parse()
                     .context("error parsing number of dice sides")?,
             });
+            self.end_scope()?;
+            self.chunk.push(EndFunction);
         } else {
             self.chunk.push(NumberLit {
                 value: number_or_lit

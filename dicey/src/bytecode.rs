@@ -38,6 +38,7 @@ pub enum OpCode {
     PushList,
     Push,
     Index,
+    Strict,
 }
 
 impl OpCode {
@@ -75,6 +76,7 @@ impl OpCode {
             32 => Self::from(PushList),
             33 => Self::from(Push),
             34 => Self::from(Index),
+            35 => Self::from(Strict),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -121,6 +123,7 @@ pub enum Instruction {
     PushList,
     Push,
     Index,
+    Strict,
 }
 
 #[enum_dispatch]
@@ -442,6 +445,7 @@ impl InstructionImpl for Roll {
 dataless_opcode!(PushList, 32);
 dataless_opcode!(Push, 33);
 dataless_opcode!(Index, 34);
+dataless_opcode!(Strict, 35);
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Chunk {

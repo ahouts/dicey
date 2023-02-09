@@ -340,6 +340,16 @@ impl Vm {
                     return Err(anyhow!("index {idx} out of bounds"));
                 }
             }
+            Instruction::Strict(_) => loop {
+                let value = self.pop()?;
+                if let Value::Function { n_args: 0, .. } = value {
+                    let new_value = self.delegate_to_no_arg_func(value, chunk)?;
+                    self.stack.push(new_value);
+                } else {
+                    self.stack.push(value);
+                    break;
+                }
+            },
         };
         Ok(())
     }
