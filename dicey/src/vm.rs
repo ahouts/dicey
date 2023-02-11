@@ -369,12 +369,24 @@ impl Vm {
                 let idx_raw = self.pop()?;
                 let idx: usize =
                     num::cast(self.as_number(chunk, idx_raw)?).context("invalid index")?;
-                let ls = self.pop_list(chunk)?;
-                if let Some(value) = ls.get(idx) {
-                    let new = value.clone();
-                    self.push(new)?;
-                } else {
-                    return Err(anyhow!("index {idx} out of bounds"));
+
+                let tmp = self.pop()?;
+                match Rc::try_unwrap(self.as_list(chunk, tmp)?) {
+                    Ok(mut ls) => {
+                        if idx < ls.len() {
+                            self.push(ls.swap_remove(idx))?;
+                        } else {
+                            return Err(anyhow!("index {idx} out of bounds"));
+                        }
+                    }
+                    Err(ls) => {
+                        if let Some(value) = ls.get(idx) {
+                            let new = value.clone();
+                            self.push(new)?;
+                        } else {
+                            return Err(anyhow!("index {idx} out of bounds"));
+                        }
+                    }
                 }
             }
             Instruction::Strict(_) => loop {
