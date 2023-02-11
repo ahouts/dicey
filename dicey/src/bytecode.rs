@@ -2,6 +2,7 @@ use std::mem::size_of;
 
 use anyhow::{anyhow, Context, Result};
 use enum_dispatch::enum_dispatch;
+use smartstring::{LazyCompact, SmartString};
 
 #[enum_dispatch(OpCodeImpl)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -35,10 +36,12 @@ pub enum OpCode {
     EndElse,
     Mod,
     RollOp,
-    PushList,
+    BeginList,
     Push,
     Index,
     Strict,
+    FieldAccessOp,
+    FinalizeList,
 }
 
 impl OpCode {
@@ -73,10 +76,12 @@ impl OpCode {
             29 => Self::from(EndElse),
             30 => Self::from(Mod),
             31 => Self::from(RollOp),
-            32 => Self::from(PushList),
+            32 => Self::from(BeginList),
             33 => Self::from(Push),
             34 => Self::from(Index),
             35 => Self::from(Strict),
+            36 => Self::from(FieldAccessOp),
+            37 => Self::from(FinalizeList),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -85,7 +90,7 @@ impl OpCode {
 #[enum_dispatch]
 pub trait OpCodeImpl {
     fn byte(self) -> u8;
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)>;
+    fn read(self, buffer: &[u8], chunk: &Chunk) -> Result<(Instruction, usize)>;
 }
 
 #[enum_dispatch(InstructionImpl)]
@@ -120,16 +125,18 @@ pub enum Instruction {
     EndElse,
     Mod,
     Roll,
-    PushList,
+    BeginList,
     Push,
     Index,
     Strict,
+    FieldAccess,
+    FinalizeList,
 }
 
 #[enum_dispatch]
 pub trait InstructionImpl {
     fn op_code(&self) -> OpCode;
-    fn write(&self, chunk: &mut Chunk);
+    fn write(&self, chunk: &mut Chunk) -> Result<()>;
 }
 
 macro_rules! dataless_opcode {
@@ -142,7 +149,7 @@ macro_rules! dataless_opcode {
                 $code
             }
 
-            fn read(self, _: &[u8]) -> Result<(Instruction, usize)> {
+            fn read(self, _: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
                 Ok((Instruction::from($t), 0))
             }
         }
@@ -152,7 +159,9 @@ macro_rules! dataless_opcode {
                 OpCode::from($t)
             }
 
-            fn write(&self, _: &mut Chunk) {}
+            fn write(&self, _: &mut Chunk) -> Result<()> {
+                Ok(())
+            }
         }
     };
 }
@@ -165,7 +174,7 @@ impl OpCodeImpl for NumberLitOp {
         1
     }
 
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+    fn read(self, buffer: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
         const SIZE: usize = size_of::<f64>();
         if buffer.len() < SIZE {
             Err(anyhow!("incomplete number literal at end of bytecode"))
@@ -192,10 +201,11 @@ impl InstructionImpl for NumberLit {
         OpCode::from(NumberLitOp)
     }
 
-    fn write(&self, chunk: &mut Chunk) {
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
         for byte in f64::to_be_bytes(self.value) {
             chunk.data.push(byte);
         }
+        Ok(())
     }
 }
 
@@ -223,7 +233,7 @@ impl OpCodeImpl for BooleanLitOp {
         17
     }
 
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+    fn read(self, buffer: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
         if buffer.is_empty() {
             Err(anyhow!("incomplete boolean literal at end of bytecode"))
         } else {
@@ -247,8 +257,9 @@ impl InstructionImpl for BooleanLit {
         OpCode::from(BooleanLitOp)
     }
 
-    fn write(&self, chunk: &mut Chunk) {
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
         chunk.data.push(u8::from(self.value));
+        Ok(())
     }
 }
 
@@ -260,7 +271,7 @@ impl OpCodeImpl for PushLocalOp {
         18
     }
 
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+    fn read(self, buffer: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
         if buffer.len() < 4 {
             Err(anyhow!("incomplete push local at end of bytecode"))
         } else {
@@ -284,10 +295,11 @@ impl InstructionImpl for PushLocal {
         OpCode::from(PushLocalOp)
     }
 
-    fn write(&self, chunk: &mut Chunk) {
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
         for byte in u32::to_be_bytes(self.id) {
             chunk.data.push(byte);
         }
+        Ok(())
     }
 }
 
@@ -299,7 +311,7 @@ impl OpCodeImpl for LoadLocalOp {
         20
     }
 
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+    fn read(self, buffer: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
         if buffer.len() < 4 {
             Err(anyhow!("incomplete load local at end of bytecode"))
         } else {
@@ -323,10 +335,11 @@ impl InstructionImpl for LoadLocal {
         OpCode::from(LoadLocalOp)
     }
 
-    fn write(&self, chunk: &mut Chunk) {
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
         for byte in u32::to_be_bytes(self.id) {
             chunk.data.push(byte);
         }
+        Ok(())
     }
 }
 
@@ -338,7 +351,7 @@ impl OpCodeImpl for CallOp {
         22
     }
 
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+    fn read(self, buffer: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
         if buffer.is_empty() {
             Err(anyhow!("incomplete call at end of bytecode"))
         } else {
@@ -357,8 +370,9 @@ impl InstructionImpl for Call {
         OpCode::from(CallOp)
     }
 
-    fn write(&self, chunk: &mut Chunk) {
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
         chunk.data.push(self.n_args);
+        Ok(())
     }
 }
 
@@ -370,7 +384,7 @@ impl OpCodeImpl for FunctionOp {
         23
     }
 
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+    fn read(self, buffer: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
         if buffer.is_empty() {
             Err(anyhow!("incomplete function at end of bytecode"))
         } else {
@@ -389,8 +403,9 @@ impl InstructionImpl for Function {
         OpCode::from(FunctionOp)
     }
 
-    fn write(&self, chunk: &mut Chunk) {
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
         chunk.data.push(self.n_args);
+        Ok(())
     }
 }
 
@@ -410,7 +425,7 @@ impl OpCodeImpl for RollOp {
         31
     }
 
-    fn read(self, buffer: &[u8]) -> Result<(Instruction, usize)> {
+    fn read(self, buffer: &[u8], _: &Chunk) -> Result<(Instruction, usize)> {
         if buffer.len() < 2 {
             Err(anyhow!("incomplete roll at end of bytecode"))
         } else {
@@ -436,34 +451,89 @@ impl InstructionImpl for Roll {
         OpCode::from(RollOp)
     }
 
-    fn write(&self, chunk: &mut Chunk) {
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
         chunk.data.push(self.n);
         chunk.data.push(self.d);
+        Ok(())
     }
 }
 
-dataless_opcode!(PushList, 32);
+dataless_opcode!(BeginList, 32);
 dataless_opcode!(Push, 33);
 dataless_opcode!(Index, 34);
 dataless_opcode!(Strict, 35);
 
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct FieldAccessOp;
+
+impl OpCodeImpl for FieldAccessOp {
+    fn byte(self) -> u8 {
+        36
+    }
+
+    fn read(self, buffer: &[u8], chunk: &Chunk) -> Result<(Instruction, usize)> {
+        if buffer.is_empty() {
+            Err(anyhow!("incomplete roll at end of bytecode"))
+        } else {
+            Ok((
+                Instruction::from(FieldAccess {
+                    field: chunk.fields[buffer[0] as usize].clone(),
+                }),
+                1,
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldAccess {
+    pub field: SmartString<LazyCompact>,
+}
+
+impl InstructionImpl for FieldAccess {
+    fn op_code(&self) -> OpCode {
+        OpCode::from(FieldAccessOp)
+    }
+
+    fn write(&self, chunk: &mut Chunk) -> Result<()> {
+        let idx = if let Some((idx, _)) = chunk
+            .fields
+            .iter()
+            .enumerate()
+            .find(|(_, name)| *name == &self.field)
+        {
+            idx
+        } else {
+            let idx = chunk.fields.len();
+            chunk.fields.push(self.field.clone());
+            idx
+        };
+        chunk.data.push(idx.try_into().context("too many fields")?);
+        Ok(())
+    }
+}
+
+dataless_opcode!(FinalizeList, 37);
+
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Chunk {
     pub data: Vec<u8>,
+    pub fields: Vec<SmartString<LazyCompact>>,
 }
 
 impl Chunk {
-    pub fn push(&mut self, ins: impl Into<Instruction>) {
+    pub fn push(&mut self, ins: impl Into<Instruction>) -> Result<()> {
         let ins = ins.into();
         let code = ins.op_code().byte();
         self.data.push(code);
-        ins.write(self);
+        ins.write(self)?;
+        Ok(())
     }
 
     pub fn read(&self, index: usize) -> Result<(Instruction, usize)> {
         let code = self.data.get(index).context("read past end of chunk")?;
         let op_code = OpCode::from_byte(*code)?;
-        let (ins, off) = op_code.read(&self.data[(index + 1)..])?;
+        let (ins, off) = op_code.read(&self.data[(index + 1)..], self)?;
         Ok((ins, off + 1))
     }
 }

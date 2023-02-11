@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
 use crate::bytecode::{
-    Add, And, BeginElse, BeginIf, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction, EndIf,
-    Equal, Function, Greater, GreaterEqual, If, Index, Instruction, Less, LessEqual, LoadLocal,
-    Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or, Push, PushList, PushLocal, Roll, Strict,
-    Subtract,
+    Add, And, BeginElse, BeginIf, BeginList, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction,
+    EndIf, Equal, FieldAccess, FinalizeList, Function, Greater, GreaterEqual, If, Index,
+    Instruction, Less, LessEqual, LoadLocal, Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or,
+    Push, PushLocal, Roll, Strict, Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
+use smartstring::SmartString;
 
 #[derive(Parser)]
 #[grammar = "dicey.pest"]
@@ -54,6 +55,9 @@ impl Compiler {
                 Rule::declaration => {
                     self.declaration(pair)?;
                 }
+                Rule::assignment => {
+                    todo!()
+                }
                 Rule::expression => {
                     self.expression(pair)?;
                 }
@@ -76,6 +80,9 @@ impl Compiler {
             match pair.as_rule() {
                 Rule::declaration => {
                     self.declaration(pair)?;
+                }
+                Rule::assignment => {
+                    todo!()
                 }
                 Rule::expression => {
                     self.expression(pair)?;
@@ -116,7 +123,7 @@ impl Compiler {
             }
             Rule::expression => {
                 self.expression(expr)?;
-                self.chunk.push(Strict);
+                self.chunk.push(Strict)?;
             }
             Rule::function => {
                 self.function(expr)?;
@@ -130,7 +137,7 @@ impl Compiler {
             }
         }
 
-        self.chunk.push(PushLocal { id: local_id });
+        self.chunk.push(PushLocal { id: local_id })?;
 
         Ok(())
     }
@@ -165,15 +172,15 @@ impl Compiler {
             .context("internal parsing error, expected if else")?;
 
         self.expression(cond)?;
-        self.chunk.push(If);
+        self.chunk.push(If)?;
 
-        self.chunk.push(BeginIf);
+        self.chunk.push(BeginIf)?;
         self.expression(body)?;
-        self.chunk.push(EndIf);
+        self.chunk.push(EndIf)?;
 
-        self.chunk.push(BeginElse);
+        self.chunk.push(BeginElse)?;
         self.expression(els)?;
-        self.chunk.push(EndElse);
+        self.chunk.push(EndElse)?;
 
         Ok(())
     }
@@ -187,7 +194,7 @@ impl Compiler {
         )?;
         while let (_, Some(item)) = (inner.next(), inner.next()) {
             self.logic_and(item)?;
-            self.chunk.push(Or);
+            self.chunk.push(Or)?;
         }
         Ok(())
     }
@@ -201,7 +208,7 @@ impl Compiler {
         )?;
         while let (_, Some(item)) = (inner.next(), inner.next()) {
             self.equality(item)?;
-            self.chunk.push(And);
+            self.chunk.push(And)?;
         }
         Ok(())
     }
@@ -224,7 +231,7 @@ impl Compiler {
                         op.as_span().as_str()
                     ))
                 }
-            });
+            })?;
         }
         Ok(())
     }
@@ -249,7 +256,7 @@ impl Compiler {
                         op.as_span().as_str()
                     ))
                 }
-            });
+            })?;
         }
         Ok(())
     }
@@ -272,7 +279,7 @@ impl Compiler {
                         op.as_span().as_str()
                     ))
                 }
-            });
+            })?;
         }
         Ok(())
     }
@@ -296,7 +303,7 @@ impl Compiler {
                         op.as_span().as_str()
                     ))
                 }
-            });
+            })?;
         }
         Ok(())
     }
@@ -319,7 +326,7 @@ impl Compiler {
             }
         }
         for op in ops.into_iter().rev() {
-            self.chunk.push(op);
+            self.chunk.push(op)?;
         }
         Ok(())
     }
@@ -338,7 +345,7 @@ impl Compiler {
                         self.expression(arg)?;
                         n_args += 1;
                     }
-                    self.chunk.push(Call { n_args });
+                    self.chunk.push(Call { n_args })?;
                 }
                 Rule::index => {
                     self.expression(
@@ -347,8 +354,11 @@ impl Compiler {
                             .next()
                             .context("no value for index")?,
                     )?;
-                    self.chunk.push(Index);
+                    self.chunk.push(Index)?;
                 }
+                Rule::identifier => self.chunk.push(FieldAccess {
+                    field: SmartString::from(qualifier.as_str()),
+                })?,
                 _ => return Err(anyhow!("unexpected qualifier: {qualifier}")),
             }
         }
@@ -364,7 +374,7 @@ impl Compiler {
                     "false" => false,
                     unexpected => return Err(anyhow!("invalid boolean {unexpected}")),
                 },
-            }),
+            })?,
             Rule::identifier => self.identifier(&pri)?,
             Rule::list => self.list(pri)?,
             Rule::function => self.function(pri)?,
@@ -390,39 +400,40 @@ impl Compiler {
                     .context("error parsing number of dice to roll")?
             };
 
-            self.chunk.push(Function { n_args: 0 });
+            self.chunk.push(Function { n_args: 0 })?;
             self.begin_scope();
             self.chunk.push(Roll {
                 n,
                 d: text[(idx + 1)..]
                     .parse()
                     .context("error parsing number of dice sides")?,
-            });
+            })?;
             self.end_scope()?;
-            self.chunk.push(EndFunction);
+            self.chunk.push(EndFunction)?;
         } else {
             self.chunk.push(NumberLit {
                 value: number_or_lit
                     .as_str()
                     .parse()
                     .context("error parsing number")?,
-            });
+            })?;
         }
         Ok(())
     }
 
     fn identifier(&mut self, id: &Pair<Rule>) -> Result<()> {
         let local_id = self.resolve_local(id.as_str())?;
-        self.chunk.push(LoadLocal { id: local_id });
+        self.chunk.push(LoadLocal { id: local_id })?;
         Ok(())
     }
 
     fn list(&mut self, ls: Pair<Rule>) -> Result<()> {
-        self.chunk.push(PushList);
+        self.chunk.push(BeginList)?;
         for elem in ls.into_inner() {
             self.expression(elem)?;
-            self.chunk.push(Push);
+            self.chunk.push(Push)?;
         }
+        self.chunk.push(FinalizeList)?;
         Ok(())
     }
 
@@ -453,14 +464,14 @@ impl Compiler {
                 .len()
                 .try_into()
                 .context("too many arguments to function")?,
-        });
+        })?;
         self.begin_scope();
         for arg in args {
-            self.chunk.push(arg);
+            self.chunk.push(arg)?;
         }
         self.expression(expr)?;
         self.end_scope()?;
-        self.chunk.push(EndFunction);
+        self.chunk.push(EndFunction)?;
 
         Ok(())
     }

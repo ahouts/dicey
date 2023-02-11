@@ -1,9 +1,12 @@
 WHITESPACE = _{ WHITE_SPACE }
 
+statement = _{ (declaration | assignment) }
 declaration = { "let" ~ identifier ~ "=" ~ (function | ( "$" ~ expression ) | lazy_expression) ~ ";" }
+assignment = { "set" ~ qualify ~ "=" ~ (function | ( "$" ~ expression ) | lazy_expression) ~ ";" }
+
 lazy_expression = { expression }
 expression = { ( if_statement | block | logic_or ) }
-block = { "{" ~ declaration* ~ expression ~ "}" }
+block = { "{" ~ statement* ~ expression ~ "}" }
 if_statement = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }
 
 logic_or = { logic_and ~ ( "or" ~ logic_and )* }
@@ -24,7 +27,7 @@ factor_op = { ( "/" | "*" | "%" ) }
 unary = { unary_op* ~ qualify }
 unary_op = { ( "!" | "-" ) }
 
-qualify = { ( primary ~ ( "(" ~ call_args ~ ")" | "[" ~ index ~ "]" )* ) }
+qualify = { ( primary ~ ( "(" ~ call_args ~ ")" | "[" ~ index ~ "]" | ("." ~ identifier) )* ) }
 call_args = { ( expression ~ ("," ~ expression)* ~ ","? )? }
 index = { expression }
 
@@ -44,4 +47,4 @@ parameters = { "|" ~ ( identifier ~ ("," ~ identifier)* ~ ","? )? ~ "|" }
 list = { "[" ~ list_items ~ "]" }
 list_items = _{ ( expression ~ ("," ~ expression)* ~ ","? )?  }
 
-file = { SOI ~ declaration* ~ expression ~ EOI }
+file = { SOI ~ statement* ~ expression ~ EOI }

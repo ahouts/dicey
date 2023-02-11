@@ -31,7 +31,7 @@ let dis = |v| {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::rc::Rc;
 
     use super::*;
     use anyhow::Result;
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn infinite_recursion() {
-        assert_err(r#"let a = a; a"#, "stack overflow");
+        assert_err(r#"let a = a; a"#, "call stack overflow");
     }
 
     #[test]
@@ -174,12 +174,12 @@ mod tests {
     fn list() {
         assert_value(
             r#"let x = [1, false, 2, true]; [ x[3], x[1], x[2], x[0] ]"#,
-            &Value::List(Arc::new(Mutex::new(vec![
+            &Value::List(Rc::new(vec![
                 Value::Boolean(true),
                 Value::Boolean(false),
                 Value::Number(2.),
                 Value::Number(1.),
-            ]))),
+            ])),
         );
     }
 
@@ -192,9 +192,37 @@ mod tests {
 
     #[test]
     fn bad_index() {
-        assert_err(r#"false[0]"#, "tried to peek list, found false");
-        assert_err(r#"1[0]"#, "tried to peek list, found 1");
-        assert_err(r#"(|| false)[0]"#, "tried to peek list, found false");
+        assert_err(r#"false[0]"#, "expected list, found false");
+        assert_err(r#"1[0]"#, "expected list, found 1");
+        assert_err(r#"(|| false)[0]"#, "expected list, found false");
+    }
+
+    #[test]
+    fn list_length() {
+        assert_value(r#"[].length"#, &Value::Number(0.));
+        assert_value(r#"[1].length"#, &Value::Number(1.));
+        assert_value(r#"[1,1].length"#, &Value::Number(2.));
+    }
+
+    #[test]
+    fn list_map() {
+        assert_value(
+            r#"[1, 2, 3, 4].map(|x| x * 2)"#,
+            &Value::List(Rc::new(vec![
+                Value::Number(2.),
+                Value::Number(4.),
+                Value::Number(6.),
+                Value::Number(8.),
+            ])),
+        );
+    }
+
+    #[test]
+    fn list_filter() {
+        assert_value(
+            r#"[1, 2, 3, 4].filter(|x| x % 2 == 0)"#,
+            &Value::List(Rc::new(vec![Value::Number(2.), Value::Number(4.)])),
+        );
     }
 
     #[test]
@@ -233,6 +261,11 @@ mod tests {
             r#"let x = || || || || || || || || || || || || || || d100; let y = x; y == y"#,
             &Value::Boolean(false),
         );
+    }
+
+    #[test]
+    fn list_unknown_field() {
+        assert_err(r#"[].abc"#, "unexpected field abc");
     }
 
     fn assert_value(code: &str, value: &Value) {
