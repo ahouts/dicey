@@ -454,9 +454,7 @@ impl Vm {
             }
             Value::Builtin(Builtin::Map(ls)) => {
                 if call.n_args != 1 {
-                    return Err(anyhow!(
-                        "called List.map with incorrect number of arguments"
-                    ));
+                    return Err(anyhow!("incorrect number of arguments: List.map(mapping)"));
                 }
 
                 let mut results = Vec::new();
@@ -474,7 +472,7 @@ impl Vm {
             Value::Builtin(Builtin::Filter(ls)) => {
                 if call.n_args != 1 {
                     return Err(anyhow!(
-                        "called List.filter with incorrect number of arguments"
+                        "incorrect number of arguments: List.filter(predicate)"
                     ));
                 }
 
@@ -495,7 +493,7 @@ impl Vm {
             Value::Builtin(Builtin::Random(ls)) => {
                 if call.n_args != 1 {
                     return Err(anyhow!(
-                        "called List.random with incorrect number of arguments"
+                        "incorrect number of arguments: List.random(default_value)"
                     ));
                 }
 

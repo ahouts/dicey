@@ -249,6 +249,14 @@ mod tests {
     }
 
     #[test]
+    fn list_random_missing_default() {
+        assert_err(
+            r#"[1, 2, 3].random()"#,
+            "incorrect number of arguments: List.random(default_value)",
+        );
+    }
+
+    #[test]
     fn assignment_lazy() {
         assert_value(r#"let x = d100; x == x"#, &Value::Boolean(false));
     }
