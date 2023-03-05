@@ -11,6 +11,7 @@ use std::rc::Rc;
 pub enum Builtin {
     Map(Rc<Vec<Value>>),
     Filter(Rc<Vec<Value>>),
+    Random(Rc<Vec<Value>>),
 }
 
 impl fmt::Display for Builtin {
@@ -410,6 +411,7 @@ impl Vm {
                     }
                     "map" => self.push(Value::Builtin(Builtin::Map(ls)))?,
                     "filter" => self.push(Value::Builtin(Builtin::Filter(ls)))?,
+                    "random" => self.push(Value::Builtin(Builtin::Random(ls)))?,
                     unexpected => return Err(anyhow!("unexpected field {unexpected}")),
                 }
             }
@@ -487,6 +489,22 @@ impl Vm {
                 }
 
                 self.push(Value::List(Rc::new(results)))?;
+
+                Ok(())
+            }
+            Value::Builtin(Builtin::Random(ls)) => {
+                if call.n_args != 1 {
+                    return Err(anyhow!(
+                        "called List.random with incorrect number of arguments"
+                    ));
+                }
+
+                if ls.is_empty() {
+                    self.push(args[0].clone())?;
+                } else {
+                    let res = ls[self.rng.usize(0..ls.len())].clone();
+                    self.push(res)?;
+                }
 
                 Ok(())
             }

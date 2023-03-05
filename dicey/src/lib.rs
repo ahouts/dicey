@@ -226,6 +226,29 @@ mod tests {
     }
 
     #[test]
+    fn list_random() {
+        assert_value(r#"[1, 2, 3].random(0)"#, &Value::Number(1.));
+        assert_value(r#"let _ = $ d2; [1, 2, 3].random(0)"#, &Value::Number(3.));
+        assert_value(
+            r#"let _ = $ d2 + d2; [1, 2, 3].random(0)"#,
+            &Value::Number(3.),
+        );
+        assert_value(
+            r#"let _ = $ d2 + d2 + d2; [1, 2, 3].random(0)"#,
+            &Value::Number(3.),
+        );
+        assert_value(
+            r#"let _ = $ d2 + d2 + d2 + d2; [1, 2, 3].random(0)"#,
+            &Value::Number(2.),
+        );
+    }
+
+    #[test]
+    fn list_random_empty_list_uses_default() {
+        assert_value(r#"[].random(1)"#, &Value::Number(1.));
+    }
+
+    #[test]
     fn assignment_lazy() {
         assert_value(r#"let x = d100; x == x"#, &Value::Boolean(false));
     }
