@@ -495,7 +495,7 @@ impl Compiler {
             let second = iter.next();
 
             if let (Some(f), Some(s)) = (first, second) {
-                if f == 'd' && ('0'..='9').contains(&s) {
+                if f == 'd' && s.is_ascii_digit() {
                     return Err(anyhow!("identifier {} is ambiguous with a dice roll", name,));
                 }
             }

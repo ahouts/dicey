@@ -299,6 +299,11 @@ mod tests {
         assert_err(r#"[].abc"#, "unexpected field abc");
     }
 
+    #[test]
+    fn d0() {
+        assert_value(r#"d0"#, &Value::Number(0.));
+    }
+
     fn assert_value(code: &str, value: &Value) {
         assert_eq!(&get_result(code).unwrap(), value);
     }

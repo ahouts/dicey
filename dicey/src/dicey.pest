@@ -34,7 +34,7 @@ index = { expression }
 primary = _{ ( number_or_roll | boolean | list | function | identifier | "(" ~ expression ~ ")" ) }
 number_or_roll = @{
     (
-          "d" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
+          "d" ~ ASCII_DIGIT+
         | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ ( ("d" ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) | ("." ~ ASCII_DIGIT*)? )
         | "0" ~ ("." ~ ASCII_DIGIT*)?
         | ("." ~ ASCII_DIGIT+)

@@ -327,12 +327,15 @@ impl Vm {
             }
             Instruction::Roll(Roll { n, d }) => {
                 let mut result = 0.;
-                for _ in 0..n {
-                    result += self
-                        .rng
-                        .u8(1..=d)
-                        .to_f64()
-                        .context("error converting u8 to f64")?;
+
+                if d != 0 {
+                    for _ in 0..n {
+                        result += self
+                            .rng
+                            .u8(1..=d)
+                            .to_f64()
+                            .context("error converting u8 to f64")?;
+                    }
                 }
 
                 self.push(Value::Number(result))?;
