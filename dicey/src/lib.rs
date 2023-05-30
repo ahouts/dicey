@@ -26,6 +26,16 @@ let dis = |v| {
     let v2 = $ v;
     if v1 < v2 then v1 else v2
 };
+let min = |xx, yy| {
+    let x = $ xx;
+    let y = $ yy;
+    if x < y then x else y
+};
+let max = |xx, yy| {
+    let x = $ xx;
+    let y = $ yy;
+    if x > y then x else y
+};
 "#;
 
 #[cfg(test)]
