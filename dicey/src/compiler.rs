@@ -192,7 +192,7 @@ impl Compiler {
                 .next()
                 .context("internal parsing error, expected at least one logic_and")?,
         )?;
-        while let (_, Some(item)) = (inner.next(), inner.next()) {
+        for item in inner {
             self.logic_and(item)?;
             self.chunk.push(Or)?;
         }
@@ -206,7 +206,7 @@ impl Compiler {
                 .next()
                 .context("internal parsing error, expected at least one equality")?,
         )?;
-        while let (_, Some(item)) = (inner.next(), inner.next()) {
+        for item in inner {
             self.equality(item)?;
             self.chunk.push(And)?;
         }

@@ -314,6 +314,26 @@ mod tests {
         assert_value(r#"d0"#, &Value::Number(0.));
     }
 
+    #[test]
+    fn fib() {
+        assert_value(
+            r#"let fib = |n| if n == 0 or n == 1 then n else fib(n-1) + fib(n-2); fib(10)"#,
+            &Value::Number(55.),
+        );
+    }
+
+    #[test]
+    fn boolean_operators() {
+        assert_value(r#"1 == 2 or 2 == 2 and true"#, &Value::Boolean(true));
+        assert_value(
+            r#"true and true == true or false == true"#,
+            &Value::Boolean(true),
+        );
+        assert_value(r#"false and (true == true)"#, &Value::Boolean(false));
+        assert_value(r#"6 < 10 and 5 > 3"#, &Value::Boolean(true));
+        assert_value(r#"6 < 10 and 5 <= 3"#, &Value::Boolean(false));
+    }
+
     fn assert_value(code: &str, value: &Value) {
         assert_eq!(&get_result(code).unwrap(), value);
     }
