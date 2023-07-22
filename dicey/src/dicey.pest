@@ -28,7 +28,10 @@ unary = { unary_op* ~ qualify }
 unary_op = { ( "!" | "-" ) }
 
 qualify = { ( primary ~ ( "(" ~ call_args ~ ")" | "[" ~ index ~ "]" | ("." ~ identifier) )* ) }
-call_args = { ( expression ~ ("," ~ expression)* ~ ","? )? }
+call_args = { ( argument ~ ("," ~ argument)* ~ ","? )? }
+argument = _{ ( "$" ~ strict_argument | lazy_argument )? }
+lazy_argument = { expression }
+strict_argument = { expression }
 index = { expression }
 
 primary = _{ ( number_or_roll | boolean | list | function | identifier | "(" ~ expression ~ ")" ) }

@@ -342,7 +342,26 @@ impl Compiler {
                 Rule::call_args => {
                     let mut n_args = 0;
                     for arg in qualifier.into_inner() {
-                        self.expression(arg)?;
+                        match arg.as_rule() {
+                            Rule::lazy_argument => {
+                                self.function_raw(
+                                    std::iter::empty(),
+                                    arg.into_inner()
+                                        .next()
+                                        .context("error unwrapping lazy argument")?,
+                                )?;
+                            }
+                            Rule::strict_argument => {
+                                self.expression(
+                                    arg.into_inner()
+                                        .next()
+                                        .context("error unwrapping strict argument")?,
+                                )?;
+                            }
+                            rule => {
+                                return Err(anyhow!("unexpected {rule:?} when parsing argument"))
+                            }
+                        }
                         n_args += 1;
                     }
                     self.chunk.push(Call { n_args })?;

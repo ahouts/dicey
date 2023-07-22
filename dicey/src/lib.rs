@@ -317,7 +317,13 @@ mod tests {
     #[test]
     fn fib() {
         assert_value(
-            r#"let fib = |n| if n == 0 or n == 1 then n else fib(n-1) + fib(n-2); fib(10)"#,
+            r#"
+                let fib = |rn| {
+                    let n = $rn;
+                    if n == 0 or n == 1 then n else fib(n-1) + fib(n-2)
+                };
+                fib(10)
+            "#,
             &Value::Number(55.),
         );
     }
@@ -332,6 +338,16 @@ mod tests {
         assert_value(r#"false and (true == true)"#, &Value::Boolean(false));
         assert_value(r#"6 < 10 and 5 > 3"#, &Value::Boolean(true));
         assert_value(r#"6 < 10 and 5 <= 3"#, &Value::Boolean(false));
+    }
+
+    #[test]
+    fn lazy_arguments() {
+        assert_value(r#"dis(d20 + 1)"#, &Value::Number(7.));
+    }
+
+    #[test]
+    fn strict_arguments() {
+        assert_value(r#"dis($ d20 + 1)"#, &Value::Number(10.));
     }
 
     fn assert_value(code: &str, value: &Value) {

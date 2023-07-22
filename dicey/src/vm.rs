@@ -9,6 +9,7 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Builtin {
+    Roll { n: u8, d: u8 },
     Map(Rc<Vec<Value>>),
     Filter(Rc<Vec<Value>>),
     Random(Rc<Vec<Value>>),
@@ -169,6 +170,10 @@ impl Vm {
                     let res = self.delegate_to_no_arg_func(result, chunk)?;
                     self.push(res)?;
                 }
+                Value::Builtin(Builtin::Roll { n, d }) => {
+                    let res = self.eval_roll(n, d)?;
+                    self.push(res)?;
+                }
                 result => break result,
             };
         };
@@ -326,19 +331,7 @@ impl Vm {
                 self.push(Value::Number(a % b))?;
             }
             Instruction::Roll(Roll { n, d }) => {
-                let mut result = 0.;
-
-                if d != 0 {
-                    for _ in 0..n {
-                        result += self
-                            .rng
-                            .u8(1..=d)
-                            .to_f64()
-                            .context("error converting u8 to f64")?;
-                    }
-                }
-
-                self.push(Value::Number(result))?;
+                self.stack.push(Value::Builtin(Builtin::Roll { n, d }));
             }
             Instruction::BeginList(_) => {
                 self.stack
@@ -395,12 +388,19 @@ impl Vm {
             }
             Instruction::Strict(_) => loop {
                 let value = self.pop()?;
-                if let Value::Function { n_args: 0, .. } = value {
-                    let new_value = self.delegate_to_no_arg_func(value, chunk)?;
-                    self.push(new_value)?;
-                } else {
-                    self.push(value)?;
-                    break;
+                match value {
+                    Value::Function { n_args: 0, .. } => {
+                        let new_value = self.delegate_to_no_arg_func(value, chunk)?;
+                        self.push(new_value)?;
+                    }
+                    Value::Builtin(Builtin::Roll { n, d }) => {
+                        let res = self.eval_roll(n, d)?;
+                        self.push(res)?;
+                    }
+                    value => {
+                        self.push(value)?;
+                        break;
+                    }
                 }
             },
             Instruction::FieldAccess(FieldAccess { field }) => {
@@ -439,7 +439,11 @@ impl Vm {
         }
 
         let result = match self.pop().context("tried to call with empty stack")? {
-            Value::Function { n_args, loc } => {
+            Value::Function {
+                mut n_args,
+                mut loc,
+            } => {
+                self.flatten_nested_function(call.n_args, &mut n_args, &mut loc, chunk)?;
                 if n_args != call.n_args {
                     return Err(anyhow!(
                         "called function with incorrect number of arguments"
@@ -535,12 +539,43 @@ impl Vm {
         Ok(())
     }
 
+    fn flatten_nested_function(
+        &mut self,
+        real_args: u8,
+        n_args: &mut u8,
+        loc: &mut usize,
+        chunk: &Chunk,
+    ) -> Result<()> {
+        while real_args != 0 && *n_args == 0 {
+            match self.delegate_to_no_arg_func(
+                Value::Function {
+                    n_args: *n_args,
+                    loc: *loc,
+                },
+                chunk,
+            )? {
+                Value::Function {
+                    n_args: new_args,
+                    loc: new_loc,
+                } => {
+                    *n_args = new_args;
+                    *loc = new_loc;
+                }
+                unexpected => return Err(anyhow!("expected function, found {unexpected}")),
+            }
+        }
+        Ok(())
+    }
+
     fn as_number(&mut self, chunk: &Chunk, mut value: Value) -> Result<f64> {
         loop {
             match value {
                 Value::Number(n) => return Ok(n),
                 Value::Function { n_args: 0, .. } => {
                     value = self.delegate_to_no_arg_func(value, chunk)?;
+                }
+                Value::Builtin(Builtin::Roll { n, d }) => {
+                    value = self.eval_roll(n, d)?;
                 }
                 unexpected => return Err(anyhow!("expected number, found {unexpected}")),
             }
@@ -567,9 +602,28 @@ impl Vm {
                 Value::Function { n_args: 0, .. } => {
                     value = self.delegate_to_no_arg_func(value, chunk)?;
                 }
+                Value::Builtin(Builtin::Roll { n, d }) => return self.eval_roll(n, d),
                 unexpected => return Err(anyhow!("expected boolean, found {unexpected}")),
             }
         }
+    }
+
+    fn eval_roll(&mut self, n: u8, d: u8) -> Result<Value> {
+        let mut result = 0.;
+
+        if d != 0 {
+            for _ in 0..n {
+                result += self
+                    .rng
+                    .u8(1..=d)
+                    .to_f64()
+                    .context("error converting u8 to f64")?;
+            }
+        }
+
+        log::trace!("{:10} {:?} {}d{} = {}", self.pc, self.stack, n, d, result);
+
+        Ok(Value::Number(result))
     }
 
     fn as_list(&mut self, chunk: &Chunk, mut value: Value) -> Result<Rc<Vec<Value>>> {
