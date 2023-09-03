@@ -350,6 +350,16 @@ mod tests {
         assert_value(r#"dis($ d20 + 1)"#, &Value::Number(10.));
     }
 
+    #[test]
+    fn repeat() {
+        assert_value(
+            r#"repeat(4, d20)"#,
+            &Value::List(Rc::new(
+                [9., 6., 4., 5.].into_iter().map(Value::Number).collect(),
+            )),
+        );
+    }
+
     fn assert_value(code: &str, value: &Value) {
         assert_eq!(&get_result(code).unwrap(), value);
     }

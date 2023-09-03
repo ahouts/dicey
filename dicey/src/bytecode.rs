@@ -42,6 +42,7 @@ pub enum OpCode {
     Strict,
     FieldAccessOp,
     FinalizeList,
+    Repeat,
 }
 
 impl OpCode {
@@ -82,6 +83,7 @@ impl OpCode {
             35 => Self::from(Strict),
             36 => Self::from(FieldAccessOp),
             37 => Self::from(FinalizeList),
+            38 => Self::from(Repeat),
             _ => return Err(anyhow!("unknown opcode {byte}")),
         })
     }
@@ -131,6 +133,7 @@ pub enum Instruction {
     Strict,
     FieldAccess,
     FinalizeList,
+    Repeat,
 }
 
 #[enum_dispatch]
@@ -514,6 +517,7 @@ impl InstructionImpl for FieldAccess {
 }
 
 dataless_opcode!(FinalizeList, 37);
+dataless_opcode!(Repeat, 38);
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Chunk {

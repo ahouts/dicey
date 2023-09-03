@@ -4,7 +4,7 @@ use crate::bytecode::{
     Add, And, BeginElse, BeginIf, BeginList, BooleanLit, Call, Chunk, Divide, EndElse, EndFunction,
     EndIf, Equal, FieldAccess, FinalizeList, Function, Greater, GreaterEqual, If, Index,
     Instruction, Less, LessEqual, LoadLocal, Mod, Multiply, Negate, Not, NotEqual, NumberLit, Or,
-    Push, PushLocal, Roll, Strict, Subtract,
+    Push, PushLocal, Repeat, Roll, Strict, Subtract,
 };
 use anyhow::{anyhow, Context, Result};
 use pest::{iterators::Pair, Parser};
@@ -50,6 +50,12 @@ impl Compiler {
     }
 
     fn file(&mut self, f: Pair<Rule>) -> Result<()> {
+        {
+            let local_id = self.add_local("repeat")?;
+            self.chunk.push(Repeat)?;
+            self.chunk.push(PushLocal { id: local_id })?;
+        }
+
         for pair in f.into_inner() {
             match pair.as_rule() {
                 Rule::declaration => {

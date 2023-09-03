@@ -13,6 +13,7 @@ pub enum Builtin {
     Map(Rc<Vec<Value>>),
     Filter(Rc<Vec<Value>>),
     Random(Rc<Vec<Value>>),
+    Repeat,
 }
 
 impl fmt::Display for Builtin {
@@ -161,22 +162,8 @@ impl Vm {
             self.execute_ins(ins, chunk)?;
         }
 
-        let result = loop {
-            let result = self.pop()?;
-
-            match result {
-                result @ Value::Function { n_args: 0, .. } => {
-                    self.recurse_depth = self.recurse_depth.saturating_add(1);
-                    let res = self.delegate_to_no_arg_func(result, chunk)?;
-                    self.push(res)?;
-                }
-                Value::Builtin(Builtin::Roll { n, d }) => {
-                    let res = self.eval_roll(n, d)?;
-                    self.push(res)?;
-                }
-                result => break result,
-            };
-        };
+        let raw_result = self.pop()?;
+        let result = self.materialize(chunk, raw_result)?;
 
         if self.stack.is_empty() {
             Ok(result)
@@ -422,6 +409,9 @@ impl Vm {
                 Value::ListPartial(ls) => self.push(Value::List(Rc::new(ls.into_inner())))?,
                 unexpected => return Err(anyhow!("expected list partial, found {unexpected}")),
             },
+            Instruction::Repeat(_) => {
+                self.push(Value::Builtin(Builtin::Repeat))?;
+            }
         };
         Ok(())
     }
@@ -510,6 +500,26 @@ impl Vm {
                     let res = ls[self.rng.usize(0..ls.len())].clone();
                     self.push(res)?;
                 }
+
+                Ok(())
+            }
+            Value::Builtin(Builtin::Repeat) => {
+                if call.n_args != 2 {
+                    return Err(anyhow!(
+                        "incorrect number of arguments: repeat(num_times, expression)"
+                    ));
+                }
+
+                let times = self
+                    .as_number(chunk, args[1].clone())?
+                    .to_u16()
+                    .context("invalid number of times to repeat expression")?;
+
+                let mut result = Vec::new();
+                for _ in 0..times {
+                    result.push(args[0].clone());
+                }
+                self.push(Value::List(Rc::new(result)))?;
 
                 Ok(())
             }
@@ -729,5 +739,30 @@ impl Vm {
             .context("could not find local")?
             .value
             .clone())
+    }
+
+    fn materialize(&mut self, chunk: &Chunk, mut value: Value) -> Result<Value> {
+        loop {
+            match value {
+                result @ Value::Function { n_args: 0, .. } => {
+                    self.recurse_depth = self.recurse_depth.saturating_add(1);
+                    let res = self.delegate_to_no_arg_func(result, chunk)?;
+                    value = res;
+                }
+                Value::Builtin(Builtin::Roll { n, d }) => {
+                    let res = self.eval_roll(n, d)?;
+                    value = res;
+                }
+                Value::List(reference) => {
+                    let res = (*reference).clone();
+                    let mut mat = Vec::with_capacity(res.len());
+                    for item in res {
+                        mat.push(self.materialize(chunk, item)?);
+                    }
+                    return Ok(Value::List(Rc::new(mat)));
+                }
+                result => return Ok(result),
+            };
+        }
     }
 }
