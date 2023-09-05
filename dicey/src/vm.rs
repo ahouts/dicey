@@ -512,7 +512,7 @@ impl Vm {
 
                 let times = self
                     .as_number(chunk, args[1].clone())?
-                    .to_u16()
+                    .to_u8()
                     .context("invalid number of times to repeat expression")?;
 
                 let mut result = Vec::new();
