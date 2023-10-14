@@ -25,6 +25,13 @@ pub struct Compiler {
     chunk: Chunk,
     scopes: Vec<Scope>,
     next_local_id: u32,
+    raw_dice_handling: RawDiceHandling,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum RawDiceHandling {
+    Zero,
+    D12,
 }
 
 impl Default for Compiler {
@@ -33,11 +40,20 @@ impl Default for Compiler {
             chunk: Chunk::default(),
             scopes: vec![Scope::default()],
             next_local_id: 0,
+            raw_dice_handling: RawDiceHandling::Zero,
         }
     }
 }
 
 impl Compiler {
+    #[must_use]
+    pub fn new(raw_dice_handling: RawDiceHandling) -> Self {
+        Self {
+            raw_dice_handling,
+            ..Self::default()
+        }
+    }
+
     pub fn compile(mut self, code: &str) -> Result<Chunk> {
         let f = DiceyParser::parse(Rule::file, code)
             .context("error parsing code")?
@@ -427,11 +443,21 @@ impl Compiler {
 
             self.chunk.push(Function { n_args: 0 })?;
             self.begin_scope();
-            self.chunk.push(Roll {
-                n,
-                d: text[(idx + 1)..]
-                    .parse()
-                    .context("error parsing number of dice sides")?,
+            self.chunk.push(if text.ends_with('d') {
+                Roll {
+                    n,
+                    d: match self.raw_dice_handling {
+                        RawDiceHandling::Zero => 0,
+                        RawDiceHandling::D12 => 12,
+                    },
+                }
+            } else {
+                Roll {
+                    n,
+                    d: text[(idx + 1)..]
+                        .parse()
+                        .context("error parsing number of dice sides")?,
+                }
             })?;
             self.end_scope()?;
             self.chunk.push(EndFunction)?;
@@ -519,10 +545,11 @@ impl Compiler {
             let first = iter.next();
             let second = iter.next();
 
-            if let (Some(f), Some(s)) = (first, second) {
-                if f == 'd' && s.is_ascii_digit() {
-                    return Err(anyhow!("identifier {} is ambiguous with a dice roll", name,));
+            match (first, second) {
+                (Some('d'), s) if s.map_or(true, |s| s.is_ascii_digit()) => {
+                    return Err(anyhow!("identifier {} is ambiguous with a dice roll", name,))
                 }
+                _ => {}
             }
         }
 

@@ -44,6 +44,7 @@ mod tests {
     use std::rc::Rc;
 
     use super::*;
+    use crate::compiler::RawDiceHandling;
     use anyhow::Result;
     use once_cell::sync::OnceCell;
 
@@ -176,8 +177,11 @@ mod tests {
     }
 
     #[test]
-    fn d_acceptable_local() {
-        assert_value(r#"let d = 5; d"#, &Value::Number(5.));
+    fn d_unacceptable_local() {
+        assert_err(
+            r#"let d = 5; d"#,
+            "identifier d is ambiguous with a dice roll",
+        );
     }
 
     #[test]
@@ -360,19 +364,38 @@ mod tests {
         );
     }
 
+    #[test]
+    fn d_is_d0() {
+        assert_value_with(r#"d"#, &Value::Number(0.), RawDiceHandling::Zero);
+        assert_value_with(r#"3d"#, &Value::Number(0.), RawDiceHandling::Zero);
+    }
+
+    #[test]
+    fn d_is_d12() {
+        assert_value_with(r#"d"#, &Value::Number(5.), RawDiceHandling::D12);
+        assert_value_with(r#"3d"#, &Value::Number(12.), RawDiceHandling::D12);
+    }
+
     fn assert_value(code: &str, value: &Value) {
-        assert_eq!(&get_result(code).unwrap(), value);
+        assert_value_with(code, value, RawDiceHandling::Zero);
+    }
+
+    fn assert_value_with(code: &str, value: &Value, raw_dice_handling: RawDiceHandling) {
+        assert_eq!(&get_result(code, raw_dice_handling).unwrap(), value);
     }
 
     fn assert_err(code: &str, error_msg: &str) {
-        assert_eq!(format!("{}", get_result(code).unwrap_err()), error_msg);
+        assert_eq!(
+            format!("{}", get_result(code, RawDiceHandling::Zero).unwrap_err()),
+            error_msg
+        );
     }
 
-    fn get_result(code: &str) -> Result<Value> {
+    fn get_result(code: &str, raw_dice_handling: RawDiceHandling) -> Result<Value> {
         init();
         let mut tmp = String::from(PRELUDE);
         tmp.push_str(code);
-        let chunk = compiler::Compiler::default().compile(tmp.as_str())?;
+        let chunk = Compiler::new(raw_dice_handling).compile(tmp.as_str())?;
         let mut vm = Vm::default();
         vm.rng.seed(12345);
         vm.execute(&chunk)
