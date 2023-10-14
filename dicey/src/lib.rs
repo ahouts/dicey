@@ -12,7 +12,7 @@ mod bytecode;
 mod compiler;
 mod vm;
 
-pub use compiler::Compiler;
+pub use compiler::{Compiler, RawDiceHandling};
 pub use vm::{Value, Vm};
 
 pub static PRELUDE: &str = r#"
@@ -44,7 +44,6 @@ mod tests {
     use std::rc::Rc;
 
     use super::*;
-    use crate::compiler::RawDiceHandling;
     use anyhow::Result;
     use once_cell::sync::OnceCell;
 
