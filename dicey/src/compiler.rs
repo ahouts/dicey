@@ -77,9 +77,6 @@ impl Compiler {
                 Rule::declaration => {
                     self.declaration(pair)?;
                 }
-                Rule::assignment => {
-                    todo!()
-                }
                 Rule::expression => {
                     self.expression(pair)?;
                 }
@@ -102,9 +99,6 @@ impl Compiler {
             match pair.as_rule() {
                 Rule::declaration => {
                     self.declaration(pair)?;
-                }
-                Rule::assignment => {
-                    todo!()
                 }
                 Rule::expression => {
                     self.expression(pair)?;
