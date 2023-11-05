@@ -13,6 +13,7 @@ pub enum Builtin {
     Map(Rc<Vec<Value>>),
     Filter(Rc<Vec<Value>>),
     Random(Rc<Vec<Value>>),
+    Sum(Rc<Vec<Value>>),
     Repeat,
 }
 
@@ -384,6 +385,10 @@ impl Vm {
                         let res = self.eval_roll(n, d)?;
                         self.push(res)?;
                     }
+                    Value::Builtin(Builtin::Sum(ls)) => {
+                        let res = self.eval_sum(chunk, ls)?;
+                        self.push(res)?;
+                    }
                     value => {
                         self.push(value)?;
                         break;
@@ -402,6 +407,7 @@ impl Vm {
                     "map" => self.push(Value::Builtin(Builtin::Map(ls)))?,
                     "filter" => self.push(Value::Builtin(Builtin::Filter(ls)))?,
                     "random" => self.push(Value::Builtin(Builtin::Random(ls)))?,
+                    "sum" => self.push(Value::Builtin(Builtin::Sum(ls)))?,
                     unexpected => return Err(anyhow!("unexpected field {unexpected}")),
                 }
             }
@@ -416,7 +422,7 @@ impl Vm {
         Ok(())
     }
 
-    #[allow(clippy::equatable_if_let)]
+    #[allow(clippy::equatable_if_let, clippy::too_many_lines)]
     fn call(&mut self, call: &Call, chunk: &Chunk) -> Result<(), anyhow::Error> {
         self.recurse_depth = self.recurse_depth.saturating_add(1);
         if self.recurse_depth >= Self::MAX_RECURSE_DEPTH {
@@ -500,6 +506,16 @@ impl Vm {
                     let res = ls[self.rng.usize(0..ls.len())].clone();
                     self.push(res)?;
                 }
+
+                Ok(())
+            }
+            Value::Builtin(Builtin::Sum(ls)) => {
+                if call.n_args != 0 {
+                    return Err(anyhow!("incorrect number of arguments: List.map(mapping)"));
+                }
+
+                let sum = self.eval_sum(chunk, ls)?;
+                self.push(sum)?;
 
                 Ok(())
             }
@@ -633,6 +649,14 @@ impl Vm {
 
         log::trace!("{:10} {:?} {}d{} = {}", self.pc, self.stack, n, d, result);
 
+        Ok(Value::Number(result))
+    }
+
+    fn eval_sum(&mut self, chunk: &Chunk, ls: Rc<Vec<Value>>) -> Result<Value> {
+        let mut result = 0.;
+        for value in ls.iter() {
+            result += self.as_number(chunk, value.clone())?;
+        }
         Ok(Value::Number(result))
     }
 

@@ -270,6 +270,16 @@ mod tests {
     }
 
     #[test]
+    fn list_sum() {
+        assert_value(r#"[1, 2, 4, 8].sum()"#, &Value::Number(15.));
+    }
+
+    #[test]
+    fn list_sum_strict() {
+        assert_value(r#"let x = $ [d4, d4, d4].sum; x + x"#, &Value::Number(10.));
+    }
+
+    #[test]
     fn assignment_lazy() {
         assert_value(r#"let x = d100; x == x"#, &Value::Boolean(false));
     }
