@@ -386,7 +386,7 @@ impl Vm {
                         self.push(res)?;
                     }
                     Value::Builtin(Builtin::Sum(ls)) => {
-                        let res = self.eval_sum(chunk, ls)?;
+                        let res = self.eval_sum(chunk, ls.as_slice())?;
                         self.push(res)?;
                     }
                     value => {
@@ -514,7 +514,7 @@ impl Vm {
                     return Err(anyhow!("incorrect number of arguments: List.map(mapping)"));
                 }
 
-                let sum = self.eval_sum(chunk, ls)?;
+                let sum = self.eval_sum(chunk, ls.as_slice())?;
                 self.push(sum)?;
 
                 Ok(())
@@ -652,9 +652,9 @@ impl Vm {
         Ok(Value::Number(result))
     }
 
-    fn eval_sum(&mut self, chunk: &Chunk, ls: Rc<Vec<Value>>) -> Result<Value> {
+    fn eval_sum(&mut self, chunk: &Chunk, ls: &[Value]) -> Result<Value> {
         let mut result = 0.;
-        for value in ls.iter() {
+        for value in ls {
             result += self.as_number(chunk, value.clone())?;
         }
         Ok(Value::Number(result))
