@@ -15,7 +15,7 @@ mod vm;
 pub use compiler::{Compiler, RawDiceHandling};
 pub use vm::{Value, Vm};
 
-pub static PRELUDE: &str = r#"
+pub static PRELUDE: &str = r"
 let adv = |v| {
     let v1 = $ v;
     let v2 = $ v;
@@ -36,7 +36,7 @@ let max = |xx, yy| {
     let y = $ yy;
     if x > y then x else y
 };
-"#;
+";
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn scoping() {
         assert_value(
-            r#"
+            r"
                 let x = 2;
                 let y = 3;
                 let z = 5;
@@ -68,7 +68,7 @@ mod tests {
                         x * y * z
                     }
                 }
-        "#,
+        ",
             &Value::Number(2. * 7. * 17.),
         );
     }
@@ -76,12 +76,12 @@ mod tests {
     #[test]
     fn rebinding() {
         assert_value(
-            r#"
+            r"
                 let x = 2;
                 let y = x;
                 let x = 3;
                 x * y
-        "#,
+        ",
             &Value::Number(3. * 2.),
         );
     }
@@ -89,96 +89,96 @@ mod tests {
     #[test]
     fn calls() {
         assert_value(
-            r#"
+            r"
             let sub = |a, b| a - b;
             let div = |a, b| a / b;
             div(7, sub(5, 3))
-        "#,
+        ",
             &Value::Number(3.5),
         );
     }
 
     #[test]
     fn calls_as_numbers() {
-        assert_value(r#"(|| 1) + (|| 2)"#, &Value::Number(3.));
+        assert_value(r"(|| 1) + (|| 2)", &Value::Number(3.));
     }
 
     #[test]
     fn if_condition() {
-        assert_value(r#"if 5 > 3 then 10 else 20"#, &Value::Number(10.));
+        assert_value(r"if 5 > 3 then 10 else 20", &Value::Number(10.));
     }
 
     #[test]
     fn else_condition() {
-        assert_value(r#"if 2 > 3 then 10 else 20"#, &Value::Number(20.));
+        assert_value(r"if 2 > 3 then 10 else 20", &Value::Number(20.));
     }
 
     #[test]
     fn nested_if_else() {
         assert_value(
-            r#"if 2 > 3 then if 5 < 3 then 10 else 20 else if 5 > 3 then 30 else 40"#,
+            r"if 2 > 3 then if 5 < 3 then 10 else 20 else if 5 > 3 then 30 else 40",
             &Value::Number(30.),
         );
     }
 
     #[test]
     fn nd() {
-        assert_value(r#"5d12"#, &Value::Number(19.));
+        assert_value(r"5d12", &Value::Number(40.));
     }
 
     #[test]
     fn final_value_eval_no_arg_func() {
-        assert_value(r#"|| d20"#, &Value::Number(9.));
+        assert_value(r"|| d20", &Value::Number(13.));
     }
 
     #[test]
     fn dis() {
-        assert_value(r#"dis(d20)"#, &Value::Number(6.));
+        assert_value(r"dis(d20)", &Value::Number(11.));
     }
 
     #[test]
     fn adv() {
-        assert_value(r#"adv(d20)"#, &Value::Number(9.));
+        assert_value(r"adv(d20)", &Value::Number(13.));
     }
 
     #[test]
     fn mod_works() {
-        assert_value(r#"10 % 3"#, &Value::Number(1.));
-        assert_value(r#"10.5 % 1"#, &Value::Number(0.5));
+        assert_value(r"10 % 3", &Value::Number(1.));
+        assert_value(r"10.5 % 1", &Value::Number(0.5));
     }
 
     #[test]
     fn chained_final_function_value() {
-        assert_value(r#"let a = || 3; let b = || a; b"#, &Value::Number(3.));
+        assert_value(r"let a = || 3; let b = || a; b", &Value::Number(3.));
     }
 
     #[test]
     fn infinite_recursion() {
-        assert_err(r#"let a = a; a"#, "call stack overflow");
+        assert_err(r"let a = a; a", "call stack overflow");
     }
 
     #[test]
     fn infinite_recursion2() {
-        assert_err(r#"let a = a + a; a"#, "stack overflow");
+        assert_err(r"let a = a + a; a", "stack overflow");
     }
 
     #[test]
     fn ambiguous_identifier() {
         assert_err(
-            r#"let d10 = 1; d10"#,
+            r"let d10 = 1; d10",
             "identifier d10 is ambiguous with a dice roll",
         );
     }
 
     #[test]
     fn ambiguous_parameter() {
-        assert_err(r#"|d5| 5"#, "identifier d5 is ambiguous with a dice roll");
+        assert_err(r"|d5| 5", "identifier d5 is ambiguous with a dice roll");
     }
 
     #[test]
     fn d_unacceptable_local() {
         assert_err(
-            r#"let d = 5; d"#,
+            r"let d = 5; d",
             "identifier d is ambiguous with a dice roll",
         );
     }
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn list() {
         assert_value(
-            r#"let x = [1, false, 2, true]; [ x[3], x[1], x[2], x[0] ]"#,
+            r"let x = [1, false, 2, true]; [ x[3], x[1], x[2], x[0] ]",
             &Value::List(Rc::new(vec![
                 Value::Boolean(true),
                 Value::Boolean(false),
@@ -198,29 +198,29 @@ mod tests {
 
     #[test]
     fn list_out_of_bounds() {
-        assert_err(r#"[false][1]"#, "index 1 out of bounds");
-        assert_err(r#"[false][-1]"#, "invalid index");
-        assert_err(r#"[][0]"#, "index 0 out of bounds");
+        assert_err(r"[false][1]", "index 1 out of bounds");
+        assert_err(r"[false][-1]", "invalid index");
+        assert_err(r"[][0]", "index 0 out of bounds");
     }
 
     #[test]
     fn bad_index() {
-        assert_err(r#"false[0]"#, "expected list, found false");
-        assert_err(r#"1[0]"#, "expected list, found 1");
-        assert_err(r#"(|| false)[0]"#, "expected list, found false");
+        assert_err(r"false[0]", "expected list, found false");
+        assert_err(r"1[0]", "expected list, found 1");
+        assert_err(r"(|| false)[0]", "expected list, found false");
     }
 
     #[test]
     fn list_length() {
-        assert_value(r#"[].length"#, &Value::Number(0.));
-        assert_value(r#"[1].length"#, &Value::Number(1.));
-        assert_value(r#"[1,1].length"#, &Value::Number(2.));
+        assert_value(r"[].length", &Value::Number(0.));
+        assert_value(r"[1].length", &Value::Number(1.));
+        assert_value(r"[1,1].length", &Value::Number(2.));
     }
 
     #[test]
     fn list_map() {
         assert_value(
-            r#"[1, 2, 3, 4].map(|x| x * 2)"#,
+            r"[1, 2, 3, 4].map(|x| x * 2)",
             &Value::List(Rc::new(vec![
                 Value::Number(2.),
                 Value::Number(4.),
@@ -233,156 +233,156 @@ mod tests {
     #[test]
     fn list_filter() {
         assert_value(
-            r#"[1, 2, 3, 4].filter(|x| x % 2 == 0)"#,
+            r"[1, 2, 3, 4].filter(|x| x % 2 == 0)",
             &Value::List(Rc::new(vec![Value::Number(2.), Value::Number(4.)])),
         );
     }
 
     #[test]
     fn list_random() {
-        assert_value(r#"[1, 2, 3].random(0)"#, &Value::Number(1.));
-        assert_value(r#"let _ = $ d2; [1, 2, 3].random(0)"#, &Value::Number(3.));
+        assert_value(r"[1, 2, 3].random(0)", &Value::Number(3.));
+        assert_value(r"let _ = $ d2; [1, 2, 3].random(0)", &Value::Number(3.));
         assert_value(
-            r#"let _ = $ d2 + d2; [1, 2, 3].random(0)"#,
+            r"let _ = $ d2 + d2; [1, 2, 3].random(0)",
             &Value::Number(3.),
         );
         assert_value(
-            r#"let _ = $ d2 + d2 + d2; [1, 2, 3].random(0)"#,
-            &Value::Number(3.),
+            r"let _ = $ d2 + d2 + d2; [1, 2, 3].random(0)",
+            &Value::Number(1.),
         );
         assert_value(
-            r#"let _ = $ d2 + d2 + d2 + d2; [1, 2, 3].random(0)"#,
+            r"let _ = $ d2 + d2 + d2 + d2; [1, 2, 3].random(0)",
             &Value::Number(2.),
         );
     }
 
     #[test]
     fn list_random_empty_list_uses_default() {
-        assert_value(r#"[].random(1)"#, &Value::Number(1.));
+        assert_value(r"[].random(1)", &Value::Number(1.));
     }
 
     #[test]
     fn list_random_missing_default() {
         assert_err(
-            r#"[1, 2, 3].random()"#,
+            r"[1, 2, 3].random()",
             "incorrect number of arguments: List.random(default_value)",
         );
     }
 
     #[test]
     fn list_sum() {
-        assert_value(r#"[1, 2, 4, 8].sum()"#, &Value::Number(15.));
+        assert_value(r"[1, 2, 4, 8].sum()", &Value::Number(15.));
     }
 
     #[test]
     fn list_sum_strict() {
-        assert_value(r#"let x = $ [d4, d4, d4].sum; x + x"#, &Value::Number(10.));
+        assert_value(r"let x = $ [d4, d4, d4].sum; x + x", &Value::Number(20.));
     }
 
     #[test]
     fn assignment_lazy() {
-        assert_value(r#"let x = d100; x == x"#, &Value::Boolean(false));
+        assert_value(r"let x = d100; x == x", &Value::Boolean(false));
     }
 
     #[test]
     fn strict_assignment_not_lazy() {
-        assert_value(r#"let x = $ d100; x == x"#, &Value::Boolean(true));
+        assert_value(r"let x = $ d100; x == x", &Value::Boolean(true));
     }
 
     #[test]
     fn tower_of_doom() {
         assert_value(
-            r#"let x = || || || || || || || || || || || || || || 5; x + 1"#,
+            r"let x = || || || || || || || || || || || || || || 5; x + 1",
             &Value::Number(6.),
         );
         assert_value(
-            r#"let x = || || || || || || || || || || || || || || false; if x then 1 else 0"#,
+            r"let x = || || || || || || || || || || || || || || false; if x then 1 else 0",
             &Value::Number(0.),
         );
         assert_value(
-            r#"let x = || || || || || || || || || || || || || || [true]; x[0]"#,
+            r"let x = || || || || || || || || || || || || || || [true]; x[0]",
             &Value::Boolean(true),
         );
         assert_value(
-            r#"let x = || || || || || || || || || || || || || || 5; x < 3"#,
+            r"let x = || || || || || || || || || || || || || || 5; x < 3",
             &Value::Boolean(false),
         );
         assert_value(
-            r#"let x = || || || || || || || || || || || || || || d100; let y = $ x; y == y"#,
+            r"let x = || || || || || || || || || || || || || || d100; let y = $ x; y == y",
             &Value::Boolean(true),
         );
         assert_value(
-            r#"let x = || || || || || || || || || || || || || || d100; let y = x; y == y"#,
+            r"let x = || || || || || || || || || || || || || || d100; let y = x; y == y",
             &Value::Boolean(false),
         );
     }
 
     #[test]
     fn list_unknown_field() {
-        assert_err(r#"[].abc"#, "unexpected field abc");
+        assert_err(r"[].abc", "unexpected field abc");
     }
 
     #[test]
     fn d0() {
-        assert_value(r#"d0"#, &Value::Number(0.));
+        assert_value(r"d0", &Value::Number(0.));
     }
 
     #[test]
     fn fib() {
         assert_value(
-            r#"
+            r"
                 let fib = |rn| {
                     let n = $rn;
                     if n == 0 or n == 1 then n else fib(n-1) + fib(n-2)
                 };
                 fib(10)
-            "#,
+            ",
             &Value::Number(55.),
         );
     }
 
     #[test]
     fn boolean_operators() {
-        assert_value(r#"1 == 2 or 2 == 2 and true"#, &Value::Boolean(true));
+        assert_value(r"1 == 2 or 2 == 2 and true", &Value::Boolean(true));
         assert_value(
-            r#"true and true == true or false == true"#,
+            r"true and true == true or false == true",
             &Value::Boolean(true),
         );
-        assert_value(r#"false and (true == true)"#, &Value::Boolean(false));
-        assert_value(r#"6 < 10 and 5 > 3"#, &Value::Boolean(true));
-        assert_value(r#"6 < 10 and 5 <= 3"#, &Value::Boolean(false));
+        assert_value(r"false and (true == true)", &Value::Boolean(false));
+        assert_value(r"6 < 10 and 5 > 3", &Value::Boolean(true));
+        assert_value(r"6 < 10 and 5 <= 3", &Value::Boolean(false));
     }
 
     #[test]
     fn lazy_arguments() {
-        assert_value(r#"dis(d20 + 1)"#, &Value::Number(7.));
+        assert_value(r"dis(d20 + 1)", &Value::Number(12.));
     }
 
     #[test]
     fn strict_arguments() {
-        assert_value(r#"dis($ d20 + 1)"#, &Value::Number(10.));
+        assert_value(r"dis($ d20 + 1)", &Value::Number(14.));
     }
 
     #[test]
     fn repeat() {
         assert_value(
-            r#"repeat(4, d20)"#,
+            r"repeat(4, d20)",
             &Value::List(Rc::new(
-                [9., 6., 4., 5.].into_iter().map(Value::Number).collect(),
+                [13., 11., 19., 8.].into_iter().map(Value::Number).collect(),
             )),
         );
     }
 
     #[test]
     fn d_is_d0() {
-        assert_value_with(r#"d"#, &Value::Number(0.), RawDiceHandling::Zero);
-        assert_value_with(r#"3d"#, &Value::Number(0.), RawDiceHandling::Zero);
+        assert_value_with(r"d", &Value::Number(0.), RawDiceHandling::Zero);
+        assert_value_with(r"3d", &Value::Number(0.), RawDiceHandling::Zero);
     }
 
     #[test]
     fn d_is_d12() {
-        assert_value_with(r#"d"#, &Value::Number(5.), RawDiceHandling::D12);
-        assert_value_with(r#"3d"#, &Value::Number(12.), RawDiceHandling::D12);
+        assert_value_with(r"d", &Value::Number(8.), RawDiceHandling::D12);
+        assert_value_with(r"3d", &Value::Number(26.), RawDiceHandling::D12);
     }
 
     fn assert_value(code: &str, value: &Value) {
