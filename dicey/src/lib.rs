@@ -8,6 +8,7 @@
 )]
 #![allow(clippy::missing_errors_doc)]
 
+mod ast;
 mod bytecode;
 mod compiler;
 mod vm;

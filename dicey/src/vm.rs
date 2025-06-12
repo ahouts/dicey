@@ -337,7 +337,7 @@ impl Vm {
                         Some(Value::ListPartial(_)) => break,
                         Some(value) => return Err(anyhow!("tried to peek list, found {value}")),
                         None => return Err(anyhow!("tried to peek list with nothing on stack")),
-                    };
+                    }
                 }
                 match self.stack.last() {
                     Some(Value::ListPartial(reference)) => match reference.try_borrow_mut() {
@@ -418,7 +418,7 @@ impl Vm {
             Instruction::Repeat(_) => {
                 self.push(Value::Builtin(Builtin::Repeat))?;
             }
-        };
+        }
         Ok(())
     }
 
@@ -786,7 +786,7 @@ impl Vm {
                     return Ok(Value::List(Rc::new(mat)));
                 }
                 result => return Ok(result),
-            };
+            }
         }
     }
 }
