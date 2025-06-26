@@ -187,12 +187,12 @@ mod tests {
     #[test]
     fn list() {
         assert_value(
-            r"let x = [1, false, 2, true]; [ x[3], x[1], x[2], x[0] ]",
+            r"let x = [10, 11, 12, 13]; [ x[3], x[1], x[2], x[0] ]",
             &Value::List(Rc::new(vec![
-                Value::Boolean(true),
-                Value::Boolean(false),
-                Value::Number(2.),
-                Value::Number(1.),
+                Value::Number(13.),
+                Value::Number(11.),
+                Value::Number(12.),
+                Value::Number(10.),
             ])),
         );
     }
